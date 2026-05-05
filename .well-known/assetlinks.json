@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.fastroutes.twa",
+        "sha256_cert_fingerprints": ["06:8D:28:07:A3:8C:CF:0B:99:D6:7D:F0:60:3E:0B:A1:41:F7:E0:CB:81:CD:A9:E3:55:2F:CB:8A:FF:A8:E5:E5"]
+      }
+    }]
