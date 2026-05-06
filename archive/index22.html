@@ -279,7 +279,7 @@
 <!-- ── LOGIN SCREEN ── -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-card">
-    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.3</span></div>
+    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.2</span></div>
     <div class="auth-tagline">FIND THE SHORTEST ORDER THROUGH ALL YOUR STOPS</div>
 
     <div class="auth-country-label">YOUR CITY / COUNTRY</div>
@@ -376,67 +376,6 @@
         <div class="hamburger-points-val" id="hbg-pts">20</div>
         <div class="hamburger-points-bar"><div class="hamburger-points-fill" id="hbg-pts-fill" style="width:100%"></div></div>
       </div>
-      <div style="padding:0 20px; margin-top:10px">
-        <div class="hamburger-points-label">SETTINGS</div>
-        <div style="margin-top:8px">
-          <div style="font-size:9px; color:#333; letter-spacing:1px; margin-bottom:4px">REGION / TRANSIT SOURCE</div>
-          <select class="auth-country-select" id="hbg-country-select" onchange="onHbgCountryChange()" style="font-size:11px; padding:8px 10px; margin-bottom:0">
-            <option value="ARG">Argentina</option>
-            <option value="AUS">Australia</option>
-            <option value="AUT">🇦🇹 Austria (ÖBB)</option>
-            <option value="BEL">Belgium</option>
-            <option value="BRA">Brazil</option>
-            <option value="BGR">Bulgaria</option>
-            <option value="CAN">Canada</option>
-            <option value="CHN">China</option>
-            <option value="HRV">Croatia</option>
-            <option value="CZE">Czech Republic</option>
-            <option value="DNK">Denmark</option>
-            <option value="EGY">Egypt</option>
-            <option value="EST">Estonia</option>
-            <option value="FIN">Finland</option>
-            <option value="FRA">France</option>
-            <option value="DEU">Germany</option>
-            <option value="GRC">Greece</option>
-            <option value="HUN">Hungary</option>
-            <option value="ISL">Iceland</option>
-            <option value="IND">India</option>
-            <option value="IDN">Indonesia</option>
-            <option value="IRL">Ireland</option>
-            <option value="ISR">Israel</option>
-            <option value="ITA">Italy</option>
-            <option value="JPN">Japan</option>
-            <option value="JOR">Jordan</option>
-            <option value="KOR">South Korea</option>
-            <option value="LVA">Latvia</option>
-            <option value="LTU">Lithuania</option>
-            <option value="LUX">Luxembourg</option>
-            <option value="MYS">Malaysia</option>
-            <option value="MLT">Malta</option>
-            <option value="MEX">Mexico</option>
-            <option value="MAR">Morocco</option>
-            <option value="NLD">Netherlands</option>
-            <option value="NZL">New Zealand</option>
-            <option value="NOR">Norway</option>
-            <option value="POL">Poland</option>
-            <option value="PRT">Portugal</option>
-            <option value="ROU">Romania</option>
-            <option value="SGP">Singapore</option>
-            <option value="SVK">Slovakia</option>
-            <option value="SVN">Slovenia</option>
-            <option value="ZAF">South Africa</option>
-            <option value="ESP">Spain</option>
-            <option value="SWE">Sweden</option>
-            <option value="CHE">Switzerland</option>
-            <option value="THA">Thailand</option>
-            <option value="TUR">Turkey</option>
-            <option value="ARE">UAE</option>
-            <option value="GBR">United Kingdom</option>
-            <option value="USA">United States</option>
-            <option value="VNM">Vietnam</option>
-          </select>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -519,8 +458,8 @@ const WRAPPER = {
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────
-let userCountry   = localStorage.getItem("userCountry") || "";
-let currentSource = localStorage.getItem("currentSource") || "here";
+let currentSource = "here"; // "here" | "obb"
+let userCountry   = "";     // ISO-3 country code from login
 let startStop = {id:"start",resolved:null,inputVal:""};
 let endStop   = {id:"end",  resolved:null,inputVal:""};
 let midStops  = [];
@@ -535,32 +474,8 @@ let stopRequested = false;
   const now=new Date(),pad=n=>String(n).padStart(2,"0");
   document.getElementById("dep-date").value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById("dep-time").value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  
-  // Sync dropdowns with saved state
-  if (userCountry || currentSource === "obb") {
-    const val = currentSource === "obb" ? "AUT" : userCountry;
-    const authSelect = document.getElementById("auth-country");
-    const hbgSelect  = document.getElementById("hbg-country-select");
-    if (authSelect) authSelect.value = val;
-    if (hbgSelect)  hbgSelect.value = val;
-    onAuthCountryChange();
-    showApp(); // Hide sign-in if already chosen
-  }
-
   renderAll(); addStop(); addStop();
 })();
-
-function onHbgCountryChange() {
-  const val = document.getElementById("hbg-country-select").value;
-  if (!val) return;
-  userCountry   = val === "AUT" ? "" : val;
-  currentSource = val === "AUT" ? "obb" : "here";
-  localStorage.setItem("userCountry", userCountry);
-  localStorage.setItem("currentSource", currentSource);
-  // Also sync the login screen dropdown just in case
-  const authSelect = document.getElementById("auth-country");
-  if (authSelect) authSelect.value = val;
-}
 
 // ── RENDER ────────────────────────────────────────────────────────────
 function renderAll(){
@@ -1142,11 +1057,6 @@ function applyCountryFromAuth() {
   if (!val) return false;
   userCountry   = val === "AUT" ? "" : val;  // ÖBB handles Austria natively
   currentSource = val === "AUT" ? "obb" : "here";
-  localStorage.setItem("userCountry", userCountry);
-  localStorage.setItem("currentSource", currentSource);
-  // Sync hamburger select as well
-  const hbgSelect = document.getElementById("hbg-country-select");
-  if (hbgSelect) hbgSelect.value = val;
   return true;
 }
 
