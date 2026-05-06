@@ -178,12 +178,6 @@
   .hamburger-points-fill{height:100%;background:#bb7700;border-radius:2px;transition:width 0.4s ease}
   .hamburger-close{position:absolute;top:14px;right:14px;background:none;border:none;color:#444;font-size:20px;cursor:pointer;padding:4px;line-height:1}
   .hamburger-close:hover{color:#ccc}
-  
-  .history-block{margin:16px 20px 0; max-height:220px; overflow-y:auto}
-  .history-item{background:#181818; border:1px solid #222; border-radius:6px; padding:10px 12px; margin-bottom:8px; cursor:pointer; transition:all 0.15s}
-  .history-item:hover{border-color:#bb7700; background:#1e1e1e}
-  .history-item-name{font-size:10px; color:#aaa; letter-spacing:1px; margin-bottom:4px; font-weight:500}
-  .history-item-meta{font-size:9px; color:#444; letter-spacing:1px}
 
   /* ── COLLAPSIBLE HEADER ── */
   .input-section{transition:all 0.35s ease}
@@ -285,7 +279,7 @@
 <!-- ── LOGIN SCREEN ── -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-card">
-    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.4</span></div>
+    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.3</span></div>
     <div class="auth-tagline">FIND THE SHORTEST ORDER THROUGH ALL YOUR STOPS</div>
 
     <div class="auth-country-label">YOUR CITY / COUNTRY</div>
@@ -443,12 +437,6 @@
           </select>
         </div>
       </div>
-      <div style="padding:0 20px; margin-top:16px">
-        <div class="hamburger-points-label">HISTORY</div>
-        <div id="history-list" class="history-block" style="margin:8px 0 0; max-height:280px">
-          <div style="font-size:9px; color:#333; letter-spacing:1px; text-align:center; margin-top:10px">NO RECENT SEARCHES</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -541,7 +529,6 @@ let sugTimers = {};
 let searching = false;
 let dragSrc   = null;
 let stopRequested = false;
-let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
 
 // ── BOOT ──────────────────────────────────────────────────────────────
 (function init(){
@@ -561,61 +548,7 @@ let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
   }
 
   renderAll(); addStop(); addStop();
-  renderHistory();
 })();
-
-// ── HISTORY ───────────────────────────────────────────────────────────
-function saveToHistory(ranked) {
-  const best = ranked[0];
-  const first = best.route[0].resolved?.name || "?";
-  const last = best.route[best.route.length - 1].resolved?.name || "?";
-  
-  const entry = {
-    name: `${first.split(/[,–-]/)[0].trim()} → ${last.split(/[,–-]/)[0].trim()}`,
-    date: document.getElementById("dep-date").value,
-    time: document.getElementById("dep-time").value,
-    startStop: JSON.parse(JSON.stringify(startStop)),
-    midStops: JSON.parse(JSON.stringify(midStops)),
-    endStop: JSON.parse(JSON.stringify(endStop)),
-    ranked: ranked,
-    timestamp: Date.now()
-  };
-
-  searchHistory.unshift(entry);
-  if (searchHistory.length > 20) searchHistory.pop();
-  localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
-  renderHistory();
-}
-
-function renderHistory() {
-  const list = document.getElementById("history-list");
-  if (!list) return;
-  if (searchHistory.length === 0) {
-    list.innerHTML = `<div style="font-size:9px; color:#333; letter-spacing:1px; text-align:center; margin-top:10px">NO RECENT SEARCHES</div>`;
-    return;
-  }
-  list.innerHTML = searchHistory.map((item, i) => `
-    <div class="history-item" onclick="loadHistoryItem(${i})">
-      <div class="history-item-name">${esc(item.name)}</div>
-      <div class="history-item-meta">${item.date} @ ${item.time} · ${item.ranked[0].route.length} stops</div>
-    </div>
-  `).join("");
-}
-
-function loadHistoryItem(index) {
-  const item = searchHistory[index];
-  if (!item) return;
-
-  document.getElementById("dep-date").value = item.date;
-  document.getElementById("dep-time").value = item.time;
-  startStop = JSON.parse(JSON.stringify(item.startStop));
-  midStops = JSON.parse(JSON.stringify(item.midStops));
-  endStop = JSON.parse(JSON.stringify(item.endStop));
-
-  renderAll();
-  renderResults(item.ranked, !!endStop.resolved);
-  closeHamburger();
-}
 
 function onHbgCountryChange() {
   const val = document.getElementById("hbg-country-select").value;
@@ -917,7 +850,6 @@ async function doSearch(){
     if(stopRequested){showErr("Search was stopped.");return;}
     if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
     renderResults(ranked,!!fixedEnd);
-    saveToHistory(ranked);
   }catch(e){showErr(e.message);}
   finally{searching=false;stopRequested=false;updateSearchBtn();btn.classList.remove("stopping");btn.disabled=false;prog.style.display="none";}
 }
