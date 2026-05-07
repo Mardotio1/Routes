@@ -285,7 +285,7 @@
 <!-- ── LOGIN SCREEN ── -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-card">
-    <div class="auth-logo"><span>FAST</span> ROUTES <span id="auth-ver-label" style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'"></span></div>
+    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.5.1</span></div>
     <div class="auth-tagline">FIND THE SHORTEST ORDER THROUGH ALL YOUR STOPS</div>
 
     <div class="auth-country-label">YOUR CITY / COUNTRY</div>
@@ -450,7 +450,7 @@
         </div>
       </div>
       <div style="margin-top:auto; padding:20px; border-top:1px solid #1e1e1e; text-align:center">
-        <div id="hbg-ver-label" style="font-size:9px; color:#333; letter-spacing:2px"></div>
+        <div style="font-size:9px; color:#333; letter-spacing:2px">VERSION 0.5</div>
       </div>
     </div>
   </div>
@@ -521,11 +521,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.2";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
-
-// ... rest of config ...
-
 
 // ÖBB HAFAS (Austria only)
 const PROXY   = "https://rough-band-354c.yyoouu99-yy.workers.dev/?url=";
@@ -556,10 +552,6 @@ let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
   document.getElementById("dep-date").value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById("dep-time").value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
   
-  // Set version strings
-  document.getElementById("auth-ver-label").textContent = `v${APP_VERSION}`;
-  document.getElementById("hbg-ver-label").textContent = `VERSION ${APP_VERSION}`;
-
   // Sync dropdowns with saved state
   if (userCountry || currentSource === "obb") {
     const val = currentSource === "obb" ? "AUT" : userCountry;
@@ -887,6 +879,9 @@ async function doSearch(){
   if(searching){if(confirm("Stop the current search?")){stopRequested=true;btn.innerHTML="STOPPING…";btn.disabled=true;}return;}
   const prog=document.getElementById("progress"),res=document.getElementById("results");
   res.innerHTML="";prog.style.display="none";
+
+  const autoResolve=async s=>{if(!s.resolved&&s.inputVal.trim().length>=2){try{const locs=await locMatch(s.inputVal.trim());if(locs.length)pickStop(s.id,locs[0],midStops.includes(s));}catch{}}};
+  await autoResolve(startStop);for(const s of midStops)await autoResolve(s);await autoResolve(endStop);
 
   const checkUnresolved = s => s.inputVal.trim().length > 0 && !s.resolved;
   if (checkUnresolved(startStop) || midStops.some(checkUnresolved) || checkUnresolved(endStop)) {
