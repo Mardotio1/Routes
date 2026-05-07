@@ -285,7 +285,7 @@
 <!-- ── LOGIN SCREEN ── -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-card">
-    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.5.1</span></div>
+    <div class="auth-logo"><span>FAST</span> ROUTES <span style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'">v0.5</span></div>
     <div class="auth-tagline">FIND THE SHORTEST ORDER THROUGH ALL YOUR STOPS</div>
 
     <div class="auth-country-label">YOUR CITY / COUNTRY</div>
@@ -630,15 +630,6 @@ function onHbgCountryChange() {
   // Also sync the login screen dropdown just in case
   const authSelect = document.getElementById("auth-country");
   if (authSelect) authSelect.value = val;
-  resetResolution();
-}
-
-function resetResolution() {
-  const clear = s => { s.resolved = null; };
-  clear(startStop);
-  midStops.forEach(clear);
-  clear(endStop);
-  renderAll();
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────
@@ -882,12 +873,6 @@ async function doSearch(){
 
   const autoResolve=async s=>{if(!s.resolved&&s.inputVal.trim().length>=2){try{const locs=await locMatch(s.inputVal.trim());if(locs.length)pickStop(s.id,locs[0],midStops.includes(s));}catch{}}};
   await autoResolve(startStop);for(const s of midStops)await autoResolve(s);await autoResolve(endStop);
-
-  const checkUnresolved = s => s.inputVal.trim().length > 0 && !s.resolved;
-  if (checkUnresolved(startStop) || midStops.some(checkUnresolved) || checkUnresolved(endStop)) {
-    showErr("One or more stops are not validated. Please select a suggestion from the list.");
-    return;
-  }
 
   const hasStart=!!startStop.resolved,validMids=midStops.filter(s=>s.resolved),fixedEnd=endStop.resolved||null;
   const total=(hasStart?1:0)+validMids.length+(fixedEnd?1:0);
@@ -1233,7 +1218,6 @@ function applyCountryFromAuth() {
   // Sync hamburger select as well
   const hbgSelect = document.getElementById("hbg-country-select");
   if (hbgSelect) hbgSelect.value = val;
-  resetResolution();
   return true;
 }
 
