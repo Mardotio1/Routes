@@ -521,7 +521,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.3";
+const APP_VERSION = "0.5.2";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -589,9 +589,7 @@ function saveToHistory(ranked) {
     midStops: JSON.parse(JSON.stringify(midStops)),
     endStop: JSON.parse(JSON.stringify(endStop)),
     ranked: ranked,
-    timestamp: Date.now(),
-    userCountry: userCountry,
-    currentSource: currentSource
+    timestamp: Date.now()
   };
 
   searchHistory.unshift(entry);
@@ -615,53 +613,10 @@ function renderHistory() {
   `).join("");
 }
 
-let pendingHistoryItem = null;
-
 function loadHistoryItem(index) {
   const item = searchHistory[index];
   if (!item) return;
 
-  const currentRegion = getRegionDisplayName(userCountry, currentSource);
-  const targetRegion = getRegionDisplayName(item.userCountry, item.currentSource);
-
-  if (item.currentSource !== currentSource || (item.currentSource === "here" && item.userCountry !== userCountry)) {
-    pendingHistoryItem = item;
-    document.getElementById("hist-conf-new").textContent = targetRegion;
-    document.getElementById("hist-conf-curr").textContent = currentRegion;
-    document.getElementById("history-confirm-modal").style.display = "flex";
-    return;
-  }
-
-  applyHistoryItem(item);
-}
-
-function onHistConfirmYes() {
-  document.getElementById("history-confirm-modal").style.display = "none";
-  if (pendingHistoryItem) {
-    const item = pendingHistoryItem;
-    userCountry = item.userCountry;
-    currentSource = item.currentSource;
-    localStorage.setItem("userCountry", userCountry);
-    localStorage.setItem("currentSource", currentSource);
-    
-    // Sync dropdowns
-    const val = currentSource === "obb" ? "AUT" : userCountry;
-    const authSelect = document.getElementById("auth-country");
-    const hbgSelect  = document.getElementById("hbg-country-select");
-    if (authSelect) authSelect.value = val;
-    if (hbgSelect)  hbgSelect.value = val;
-
-    applyHistoryItem(item);
-    pendingHistoryItem = null;
-  }
-}
-
-function onHistConfirmNo() {
-  document.getElementById("history-confirm-modal").style.display = "none";
-  pendingHistoryItem = null;
-}
-
-function applyHistoryItem(item) {
   document.getElementById("dep-date").value = item.date;
   document.getElementById("dep-time").value = item.time;
   startStop = JSON.parse(JSON.stringify(item.startStop));
@@ -1077,14 +1032,6 @@ function updateHamburgerUser(){
   updateCounter();
 }
 
-function getRegionDisplayName(country, source) {
-  if (source === "obb") return "Austria (ÖBB)";
-  const sel = document.getElementById("hbg-country-select");
-  if (!sel) return country || "Global";
-  const opt = Array.from(sel.options).find(o => o.value === country);
-  return opt ? opt.textContent : country || "Global";
-}
-
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function permute(arr){if(arr.length<=1)return[arr.slice()];const out=[];for(let i=0;i<arr.length;i++){const rest=arr.filter((_,j)=>j!==i);for(const p of permute(rest))out.push([arr[i],...p]);}return out;}
 
@@ -1344,22 +1291,6 @@ async function handleSignOut() {
 }
 </script>
 
-
-<!-- History Confirm Modal -->
-<div class="ad-overlay" id="history-confirm-modal" style="display:none">
-  <div class="confirm-modal">
-    <div class="confirm-icon">🌍</div>
-    <div class="confirm-title">SWITCH REGION?</div>
-    <div class="confirm-body">
-      This result is from <strong><span id="hist-conf-new">X</span></strong> while your current region is <strong><span id="hist-conf-curr">Y</span></strong>.<br><br>
-      Switch regions to load this history?
-    </div>
-    <div class="confirm-btns">
-      <button class="confirm-no"  onclick="onHistConfirmNo()">NO</button>
-      <button class="confirm-yes" onclick="onHistConfirmYes()">YES, SWITCH</button>
-    </div>
-  </div>
-</div>
 
 <!-- Ad Confirm Modal -->
 <div class="ad-overlay" id="ad-confirm-modal" style="display:none">
