@@ -522,7 +522,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.5";
+const APP_VERSION = "0.5.4";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -1082,21 +1082,6 @@ function openHamburger(){
 function closeHamburger(){
   document.getElementById("hamburger-menu").style.display="none";
 }
-
-function showAuthOverlay() {
-  const overlay = document.getElementById("auth-overlay");
-  if (overlay) {
-    overlay.style.display = "flex";
-    // Ensure dropdown is synced
-    const authSelect = document.getElementById("auth-country");
-    if (authSelect) {
-      authSelect.value = currentSource === "obb" ? "AUT" : userCountry;
-      onAuthCountryChange();
-    }
-  }
-  closeHamburger();
-}
-
 function updateHamburgerUser(){
   const user=window._currentUser||null;
   const nameEl=document.getElementById("hbg-name");
@@ -1371,12 +1356,7 @@ function updateAuthUI(user) {
     // Only auto-skip the overlay if user already chose a country this session
     if (userCountry || currentSource === "obb") showApp();
   } else {
-    slot.innerHTML = `
-      <div class="auth-pill" onclick="showAuthOverlay()" style="background:#1a1a1a; border-color:#2a2a2a">
-        <div class="auth-pill-avatar" style="background:rgba(255,255,255,0.1)">👤</div>
-        <span class="auth-pill-name" style="color:#888">GUEST USER</span>
-        <span class="auth-pill-out" style="color:#555">SIGN IN</span>
-      </div>`;
+    slot.innerHTML = "";
   }
   updateHamburgerUser();
 }
