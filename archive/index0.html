@@ -96,7 +96,6 @@
   input.stop-input:focus{border-color:#4a90d9}
   input.stop-input::placeholder{color:#666}
   input.stop-input.resolved{border-color:#1e3a1e}
-  input.stop-input.invalid{border-color:#4a1010; background:#140000}
   .stop-check{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:#2e9a2e;font-size:13px;opacity:0;transition:opacity 0.2s;pointer-events:none;font-weight:500}
   .stop-check.visible{opacity:1}
   .suggestions{position:absolute;top:calc(100% + 3px);left:0;right:0;background:#161616;border:1px solid #282828;border-radius:7px;z-index:100;overflow:hidden;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.7)}
@@ -522,7 +521,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.4";
+const APP_VERSION = "0.5.3";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -811,11 +810,7 @@ function getStopObj(id){if(id==="start")return startStop;if(id==="end")return en
 function onInput(id,val,isMid){
   const s=getStopObj(id);if(!s)return;
   s.inputVal=val;s.resolved=null;
-  const inp=document.getElementById(`inp-${id}`);
-  if(inp){
-    inp.classList.remove("resolved");
-    inp.classList.remove("invalid");
-  }
+  document.getElementById(`inp-${id}`)?.classList.remove("resolved");
   const lbl=document.getElementById(`lbl-${id}`);if(lbl){lbl.className="stop-check";}
   hideSug(id);clearTimeout(sugTimers[id]);
   updateSearchBtn();
@@ -935,28 +930,11 @@ async function getMinutesForPair(a,b){
 async function doSearch(){
   const btn=document.getElementById("search-btn");
   if(searching){if(confirm("Stop the current search?")){stopRequested=true;btn.innerHTML="STOPPING…";btn.disabled=true;}return;}
-
-  if (!currentSource || (currentSource === "here" && !userCountry)) {
-    showErr("Please choose your city / country in the menu first.");
-    return;
-  }
-
   const prog=document.getElementById("progress"),res=document.getElementById("results");
   res.innerHTML="";prog.style.display="none";
-  document.querySelectorAll(".stop-input").forEach(el => el.classList.remove("invalid"));
 
-  const unresolved = [];
-  const check = s => {
-    if (s.inputVal.trim().length > 0 && !s.resolved) {
-      unresolved.push(s.id);
-      return true;
-    }
-    return false;
-  };
-  check(startStop); midStops.forEach(check); check(endStop);
-
-  if (unresolved.length > 0) {
-    unresolved.forEach(id => document.getElementById(`inp-${id}`)?.classList.add("invalid"));
+  const checkUnresolved = s => s.inputVal.trim().length > 0 && !s.resolved;
+  if (checkUnresolved(startStop) || midStops.some(checkUnresolved) || checkUnresolved(endStop)) {
     showErr("One or more stops are not validated. Please select a suggestion from the list.");
     return;
   }
