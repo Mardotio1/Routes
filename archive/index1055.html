@@ -577,20 +577,13 @@ let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
 })();
 
 // ── HISTORY ───────────────────────────────────────────────────────────
-function saveToHistory(ranked, isStopped = false) {
-  let first = "?", last = "?", prunedRanked = [], totalComputed = 0;
+function saveToHistory(ranked) {
+  const best = ranked[0];
+  const first = best.route[0].resolved?.name || "?";
+  const last = best.route[best.route.length - 1].resolved?.name || "?";
   
-  if (ranked && ranked.length > 0) {
-    const best = ranked[0];
-    first = best.route[0].resolved?.name || "?";
-    last = best.route[best.route.length - 1].resolved?.name || "?";
-    // Prune ranked results for history storage to avoid "Invalid string length" / localStorage limits
-    prunedRanked = ranked.length > 1 ? [ranked[0], ranked[ranked.length - 1]] : [ranked[0]];
-    totalComputed = ranked.length;
-  } else {
-    first = startStop.resolved?.name || (midStops.find(m=>m.resolved)?.resolved?.name) || "?";
-    last = endStop.resolved?.name || ([...midStops].reverse().find(m=>m.resolved)?.resolved?.name) || "?";
-  }
+  // Prune ranked results for history storage to avoid "Invalid string length" / localStorage limits
+  const prunedRanked = ranked.length > 1 ? [ranked[0], ranked[ranked.length - 1]] : [ranked[0]];
 
   const entry = {
     name: `${first.split(/[,–-]/)[0].trim()} → ${last.split(/[,–-]/)[0].trim()}`,
@@ -600,8 +593,7 @@ function saveToHistory(ranked, isStopped = false) {
     midStops: JSON.parse(JSON.stringify(midStops)),
     endStop: JSON.parse(JSON.stringify(endStop)),
     ranked: prunedRanked,
-    totalComputed: totalComputed,
-    isStopped: isStopped,
+    totalComputed: ranked.length,
     timestamp: Date.now(),
     userCountry: userCountry,
     currentSource: currentSource
@@ -622,8 +614,8 @@ function renderHistory() {
   }
   list.innerHTML = searchHistory.map((item, i) => `
     <div class="history-item" onclick="loadHistoryItem(${i})">
-      <div class="history-item-name">${item.isStopped ? '<span style="color:#cc4444">[STOPPED] </span>' : ''}${esc(item.name)}</div>
-      <div class="history-item-meta">${item.date} @ ${item.time} · ${item.isStopped ? 'No results' : (item.ranked[0]?.route?.length || 0) + ' stops'}</div>
+      <div class="history-item-name">${esc(item.name)}</div>
+      <div class="history-item-meta">${item.date} @ ${item.time} · ${item.ranked[0].route.length} stops</div>
     </div>
   `).join("");
 }
@@ -682,12 +674,7 @@ function applyHistoryItem(item) {
   endStop = JSON.parse(JSON.stringify(item.endStop));
 
   renderAll();
-  if (item.isStopped) {
-    showErr("This search was stopped before completion.");
-    expandInputSection();
-  } else {
-    renderResults(item.ranked, !!endStop.resolved, item.totalComputed);
-  }
+  renderResults(item.ranked, !!endStop.resolved, item.totalComputed);
   closeHamburger();
 }
 
@@ -1012,12 +999,6 @@ async function doSearch(){
     }
     setProgress(pairs.length,pairs.length,"Finding best order…");
 
-    if(stopRequested){
-      saveToHistory(null, true);
-      showErr("Search was stopped.");
-      return;
-    }
-
     const perms=permute(validMids),endRef=fixedEnd?{id:"end",resolved:fixedEnd}:null;
     const ranked=perms.map(perm=>{
       const route=hasStart?[startStop,...perm,...(endRef?[endRef]:[])]:[ ...perm,...(endRef?[endRef]:[])];
@@ -1027,11 +1008,7 @@ async function doSearch(){
     }).filter(Boolean).sort((a,b)=>a.total-b.total);
 
     prog.style.display="none";
-    if(stopRequested){
-      saveToHistory(null, true);
-      showErr("Search was stopped.");
-      return;
-    }
+    if(stopRequested){showErr("Search was stopped.");return;}
     if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
     renderResults(ranked,!!fixedEnd,ranked.length);
     saveToHistory(ranked);
