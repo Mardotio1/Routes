@@ -470,9 +470,6 @@
 
       <!-- Full input fields -->
       <div class="input-fields-inner">
-        <div style="display: flex; justify-content: flex-end; margin-bottom: -10px;">
-          <button id="manual-collapse-btn" onclick="manualCollapse()" style="display:none; background:none; border:none; color:#444; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px; cursor:pointer; padding:10px;">COLLAPSE ↑</button>
-        </div>
         <!-- Departure -->
         <div class="two-col" style="margin-bottom:0">
           <div class="dt-wrap">
@@ -525,7 +522,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.11";
+const APP_VERSION = "0.5.8";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -1101,26 +1098,9 @@ function collapseInputSection(bestRoute){
   setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth",block:"start"}),100);
 }
 
-function manualCollapse(){
-  const sec=document.getElementById("input-section");
-  if(sec) sec.classList.add("collapsed");
-}
-
 function expandInputSection(){
   const sec=document.getElementById("input-section");
-  if(sec) {
-    sec.classList.remove("collapsed");
-    // Show manual collapse button if we have results
-    const res = document.getElementById("results");
-    const btn = document.getElementById("manual-collapse-btn");
-    if (btn) {
-      if (res && res.children.length > 0 && !res.querySelector('.error-box')) {
-        btn.style.display = "block";
-      } else {
-        btn.style.display = "none";
-      }
-    }
-  }
+  if(sec) sec.classList.remove("collapsed");
 }
 
 function openHamburger(){
