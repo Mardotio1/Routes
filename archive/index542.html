@@ -525,7 +525,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.13";
+const APP_VERSION = "0.5.11";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -554,18 +554,10 @@ let dragSrc   = null;
 let stopRequested = false;
 let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
 let locationStopIds = new Set(); // track which stopIds used "my location"
-let lastResults = null;
-let lastFixedEnd = false;
 
 const STATE_KEY = "fastRoutesAppState";
 
 function saveAppState() {
-  const isCollapsed = document.getElementById("input-section").classList.contains("collapsed");
-  // Prune lastResults to avoid localStorage limits
-  let prunedResults = null;
-  if (lastResults && lastResults.length > 0) {
-    prunedResults = lastResults.length > 1 ? [lastResults[0], lastResults[lastResults.length - 1]] : [lastResults[0]];
-  }
   const state = {
     startStop,
     endStop,
@@ -573,11 +565,7 @@ function saveAppState() {
     stopCtr,
     locationStopIds: Array.from(locationStopIds),
     depDate: document.getElementById("dep-date").value,
-    depTime: document.getElementById("dep-time").value,
-    lastResults: prunedResults,
-    lastResultsCount: lastResults ? lastResults.length : 0,
-    lastFixedEnd,
-    isCollapsed
+    depTime: document.getElementById("dep-time").value
   };
   localStorage.setItem(STATE_KEY, JSON.stringify(state));
 }
@@ -594,18 +582,6 @@ function loadAppState() {
       locationStopIds = new Set(state.locationStopIds || []);
       if (state.depDate) document.getElementById("dep-date").value = state.depDate;
       if (state.depTime) document.getElementById("dep-time").value = state.depTime;
-      lastResults = state.lastResults || null;
-      lastFixedEnd = state.lastFixedEnd || false;
-      const lastResultsCount = state.lastResultsCount || (lastResults ? lastResults.length : 0);
-      
-      if (lastResults) {
-        renderResults(lastResults, lastFixedEnd, lastResultsCount, true);
-        if (state.isCollapsed) {
-          collapseInputSection(lastResults[0]);
-        } else {
-          expandInputSection();
-        }
-      }
     } catch (e) { console.error("Failed to load app state", e); }
   }
 
@@ -1121,11 +1097,7 @@ function buildRouteCard(r,hasFixedEnd,isBest){
   html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${ld}"></div></div><div class="leg-content"><div class="leg-stop-name${ln}">${esc(last.resolved?.name??"—")}</div></div></div></div></div>`;
   return html;
 }
-function renderResults(ranked,hasFixedEnd,totalComputed,skipScroll = false){
-  lastResults = ranked;
-  lastFixedEnd = hasFixedEnd;
-  saveAppState();
-
+function renderResults(ranked,hasFixedEnd,totalComputed){
   const el=document.getElementById("results");
   const count=totalComputed||ranked.length;
   let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
@@ -1144,7 +1116,7 @@ function renderResults(ranked,hasFixedEnd,totalComputed,skipScroll = false){
   }
   el.innerHTML=html;
   // Collapse input section
-  collapseInputSection(ranked[0], skipScroll);
+  collapseInputSection(ranked[0]);
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────
@@ -1160,7 +1132,7 @@ function toggleWorst(){
   body.classList.toggle("open");
 }
 
-function collapseInputSection(bestRoute, skipScroll = false){
+function collapseInputSection(bestRoute){
   const sec=document.getElementById("input-section");
   const summaryEl=document.getElementById("collapsed-summary-text");
   if(!sec||!summaryEl)return;
@@ -1171,26 +1143,19 @@ function collapseInputSection(bestRoute, skipScroll = false){
   });
   summaryEl.innerHTML=short.map((n,i)=>`<span style="color:${i===0||i===short.length-1?'#aaa':'#777'}">${esc(n)}</span>`).join('<span style="color:#333"> → </span>');
   sec.classList.add("collapsed");
-  saveAppState();
   // Scroll results into view
-  if (!skipScroll) {
-    setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth",block:"start"}),100);
-  }
+  setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth",block:"start"}),100);
 }
 
 function manualCollapse(){
   const sec=document.getElementById("input-section");
-  if(sec) {
-    sec.classList.add("collapsed");
-    saveAppState();
-  }
+  if(sec) sec.classList.add("collapsed");
 }
 
 function expandInputSection(){
   const sec=document.getElementById("input-section");
   if(sec) {
     sec.classList.remove("collapsed");
-    saveAppState();
     // Show manual collapse button if we have results
     const res = document.getElementById("results");
     const btn = document.getElementById("manual-collapse-btn");
