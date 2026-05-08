@@ -522,7 +522,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.7";
+const APP_VERSION = "0.5.6";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -593,7 +593,6 @@ function saveToHistory(ranked) {
     midStops: JSON.parse(JSON.stringify(midStops)),
     endStop: JSON.parse(JSON.stringify(endStop)),
     ranked: prunedRanked,
-    totalComputed: ranked.length,
     timestamp: Date.now(),
     userCountry: userCountry,
     currentSource: currentSource
@@ -674,7 +673,7 @@ function applyHistoryItem(item) {
   endStop = JSON.parse(JSON.stringify(item.endStop));
 
   renderAll();
-  renderResults(item.ranked, !!endStop.resolved, item.totalComputed);
+  renderResults(item.ranked, !!endStop.resolved);
   closeHamburger();
 }
 
@@ -1010,7 +1009,7 @@ async function doSearch(){
     prog.style.display="none";
     if(stopRequested){showErr("Search was stopped.");return;}
     if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
-    renderResults(ranked,!!fixedEnd,ranked.length);
+    renderResults(ranked,!!fixedEnd);
     saveToHistory(ranked);
   }catch(e){showErr(e.message);}
   finally{searching=false;stopRequested=false;updateSearchBtn();btn.classList.remove("stopping");btn.disabled=false;prog.style.display="none";}
@@ -1025,10 +1024,9 @@ function buildRouteCard(r,hasFixedEnd,isBest){
   html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${ld}"></div></div><div class="leg-content"><div class="leg-stop-name${ln}">${esc(last.resolved?.name??"—")}</div></div></div></div></div>`;
   return html;
 }
-function renderResults(ranked,hasFixedEnd,totalComputed){
+function renderResults(ranked,hasFixedEnd){
   const el=document.getElementById("results");
-  const count=totalComputed||ranked.length;
-  let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
+  let html=`<div class="res-header">${ranked.length>1?ranked.length+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
   html+=buildRouteCard(ranked[0],hasFixedEnd,true);
   if(ranked.length>1){
     const worstR=ranked[ranked.length-1];
