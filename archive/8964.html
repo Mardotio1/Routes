@@ -555,7 +555,6 @@ let stopRequested = false;
 let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
 let locationStopIds = new Set(); // track which stopIds used "my location"
 let lastResults = null;
-let lastResultsCount = 0;
 let lastFixedEnd = false;
 
 const STATE_KEY = "fastRoutesAppState";
@@ -576,7 +575,7 @@ function saveAppState() {
     depDate: document.getElementById("dep-date").value,
     depTime: document.getElementById("dep-time").value,
     lastResults: prunedResults,
-    lastResultsCount: lastResultsCount,
+    lastResultsCount: lastResults ? lastResults.length : 0,
     lastFixedEnd,
     isCollapsed
   };
@@ -597,7 +596,7 @@ function loadAppState() {
       if (state.depTime) document.getElementById("dep-time").value = state.depTime;
       lastResults = state.lastResults || null;
       lastFixedEnd = state.lastFixedEnd || false;
-      lastResultsCount = state.lastResultsCount || (lastResults ? lastResults.length : 0);
+      const lastResultsCount = state.lastResultsCount || (lastResults ? lastResults.length : 0);
       
       if (lastResults) {
         renderResults(lastResults, lastFixedEnd, lastResultsCount, true);
@@ -1125,11 +1124,10 @@ function buildRouteCard(r,hasFixedEnd,isBest){
 function renderResults(ranked,hasFixedEnd,totalComputed,skipScroll = false){
   lastResults = ranked;
   lastFixedEnd = hasFixedEnd;
-  lastResultsCount = totalComputed || ranked.length;
   saveAppState();
 
   const el=document.getElementById("results");
-  const count=lastResultsCount;
+  const count=totalComputed||ranked.length;
   let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
   html+=buildRouteCard(ranked[0],hasFixedEnd,true);
   if(ranked.length>1){
