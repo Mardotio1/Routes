@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="/manifest.json">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9218540142504942" crossorigin="anonymous"></script>
+ <link rel="icon" type="image/png" href="favicon.png.jpg">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast Routes</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ── YOUR FIREBASE CONFIG — paste from Firebase console ──
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDrsv6cxtRU9uxRICpV_7mOpW6wNH92LVw",
+    authDomain:        "routes-ade9e.firebaseapp.com",
+    projectId:         "routes-ade9e",
+    storageBucket:     "routes-ade9e.firebasestorage.app",
+    messagingSenderId: "332028202616",
+    appId:             "1:332028202616:web:62871d925515251b5fe78d"
+  };
+
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const provider = new GoogleAuthProvider();
+
+  // Expose to global scope so onclick handlers can reach them
+  window._firebaseAuth     = auth;
+  window._googleProvider   = provider;
+  window._signInWithPopup  = signInWithPopup;
+  window._signOut          = signOut;
+
+  // Watch auth state — update header pill when user signs in / out
+  onAuthStateChanged(auth, user => {
+    window._currentUser = user || null;
+    updateAuthUI(user);
+  });
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d0d0d;color:#e8e4dc;font-family:'DM Mono','Courier New',monospace;min-height:100vh;padding-bottom:80px}
+  #root{max-width:480px;margin:0 auto}
+  .body{padding:20px 16px 18px}
+
+  .section-label{font-size:10px;letter-spacing:3px;margin-bottom:8px;margin-top:20px}
+  .section-label:first-child{margin-top:0}
+  .section-label.red{color:#888}
+  .section-label.grey{color:#4a4a4a}
+  .section-label.green{color:#888}
+  .section-label.amber{color:#bb7700}
+  .section-note{font-size:9px;color:#2a2a2a;margin-left:5px;letter-spacing:1px}
+
+  .two-col{display:flex;gap:8px;margin-bottom:4px}
+  .two-col > *{flex:1}
+  .dt-wrap{display:flex;flex-direction:column}
+  .dt-label{font-size:9px;color:#555;letter-spacing:2px;margin-bottom:5px}
+
+  input.dt-input, select.dt-input{
+    width:100%;background:#141414;border:1px solid #242424;border-radius:7px;
+    color:#e8e4dc;font-family:'DM Mono',monospace;font-size:13px;
+    padding:10px 12px;outline:none;transition:border-color 0.15s;
+    -webkit-appearance:none;appearance:none;color-scheme:dark;cursor:pointer
+  }
+  select.dt-input{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23555' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:30px
+  }
+  input.dt-input:focus,select.dt-input:focus{border-color:#bb7700}
+  select.dt-input:disabled{color:#2a2a2a;cursor:not-allowed;border-color:#141414}
+  input.dt-input::-webkit-calendar-picker-indicator{filter:invert(0.3) sepia(1) saturate(3) hue-rotate(10deg);cursor:pointer;opacity:0.5}
+
+  /* ── STOP ROWS ── */
+  .stop-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;position:relative;border-radius:6px;transition:background 0.12s}
+  .drag-handle{width:18px;min-width:18px;display:flex;align-items:center;justify-content:center;cursor:grab;color:#2a2a2a;font-size:15px;padding-top:11px;transition:color 0.15s;user-select:none;-webkit-user-select:none;flex-shrink:0;letter-spacing:-2px}
+  .drag-handle:hover{color:#555}.drag-handle:active{cursor:grabbing;color:#888}
+  .stop-row.dragging{opacity:0.3}
+  .stop-row.drag-over{background:#181818;outline:1px dashed #333;outline-offset:-2px}
+  .stop-row.drag-over .stop-input{border-color:#555}
+  .stop-row.drag-src-anchor{outline:1px dashed #4a1010;outline-offset:-2px;background:#0c0000}
+  .stop-input-wrap{flex:1;position:relative;margin-bottom:0}
+
+  /* ── LOCATION BUTTON ── */
+  .loc-above{position:absolute;bottom:calc(100% - 2px);left:0;right:0;display:none;z-index:102}
+  .loc-above.visible{display:block}
+  .loc-above-btn{width:100%;background:#141414;border:1px solid #282828;border-radius:6px;
+    color:#555;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+    padding:8px 13px;cursor:pointer;text-align:left;transition:all 0.15s}
+  .loc-above-btn:hover:not(:disabled){background:#1e1e1e;color:#e8e4dc;border-color:#444}
+  .loc-above-btn:disabled{color:#222;cursor:not-allowed;border-color:#141414}
+  .loc-above-btn.loading{color:#bb7700}
+
+  input.stop-input{width:100%;background:#141414;border:1px solid #242424;border-radius:7px;color:#e8e4dc;font-family:'DM Mono',monospace;font-size:13px;padding:11px 36px 11px 13px;outline:none;transition:border-color 0.15s}
+  input.stop-input:focus{border-color:#4a90d9}
+  input.stop-input::placeholder{color:#666}
+  input.stop-input.resolved{border-color:#1e3a1e}
+  input.stop-input.invalid{border-color:#4a1010; background:#140000}
+  .stop-check{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:#2e9a2e;font-size:13px;opacity:0;transition:opacity 0.2s;pointer-events:none;font-weight:500}
+  .stop-check.visible{opacity:1}
+  .suggestions{position:absolute;top:calc(100% + 3px);left:0;right:0;background:#161616;border:1px solid #282828;border-radius:7px;z-index:100;overflow:hidden;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.7)}
+  .sug-item{padding:9px 13px;font-size:12px;color:#888;cursor:pointer;border-bottom:1px solid #1a1a1a;transition:background 0.1s}
+  .sug-item:last-child{border-bottom:none}
+  .sug-item:hover,.sug-item.sel{background:#1e1e1e;color:#e8e4dc}
+  .sug-type{font-size:10px;color:#333;margin-left:6px}
+  .remove-btn{background:none;border:1px solid #2a2a2a;border-radius:5px;color:#555;font-size:17px;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:7px;transition:all 0.15s;line-height:1}
+  .remove-btn:hover{border-color:#cc0000;color:#cc0000;background:#1a0000}
+  .remove-spacer{width:30px;margin-top:7px;flex-shrink:0}
+  .add-stop-btn{width:100%;background:none;border:1px dashed #222;border-radius:7px;color:#333;font-family:'DM Mono',monospace;font-size:11px;padding:10px;cursor:pointer;letter-spacing:2px;transition:all 0.15s;margin-top:2px}
+  .add-stop-btn:hover{border-color:#444;color:#777}
+
+  .btn{width:100%;margin-top:16px;padding:16px;background:#2563eb;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:white;cursor:pointer;transition:background 0.15s,transform 0.1s}
+  .btn:hover{background:#1d4ed8}.btn:active{transform:scale(0.98)}
+  .btn:disabled{background:#181818;color:#2d2d2d;cursor:not-allowed}
+  .btn.stopping{background:#cc0000;color:#fff;border:none;letter-spacing:3px}
+  .btn.stopping:hover{background:#a80000}
+
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .pulse{animation:pulse 1.2s ease-in-out infinite}
+  .prog-wrap{margin-top:12px;background:#111;border:1px solid #1c1c1c;border-radius:8px;padding:14px}
+  .prog-label{font-size:11px;color:#4a90d9;margin-bottom:8px;letter-spacing:1px}
+  .prog-bar{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden}
+  .prog-fill{height:100%;background:#2563eb;border-radius:2px;transition:width 0.3s ease}
+  .prog-detail{font-size:10px;color:#888;margin-top:6px;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .results{margin-top:22px}
+  .res-header{font-size:10px;color:#666;letter-spacing:3px;margin-bottom:12px}
+  .route-card{background:#0e0e0e;border:1px solid #1a1a1a;border-radius:10px;padding:16px;margin-bottom:10px}
+  .route-card.best{border-color:#cc0000;background:#100000}
+  .route-card.worst{border-color:#252525;background:#090909}
+  .route-badge{display:inline-block;color:white;font-family:'Bebas Neue';font-size:11px;letter-spacing:1px;padding:2px 9px;border-radius:3px;margin-bottom:10px}
+  .route-badge.best-badge{background:#cc0000}
+  .route-badge.worst-badge{background:#1e1e1e;color:#3a3a3a}
+  .route-total{font-family:'Bebas Neue';font-size:32px;letter-spacing:3px;line-height:1;margin-bottom:14px}
+  .route-total .unit{font-size:13px;color:#444;margin-left:5px;font-family:'DM Mono';letter-spacing:1px;font-weight:400}
+  .route-total.best-total{color:#ff4444}.route-total.worst-total{color:#2a2a2a}
+  .route-stops{display:flex;flex-direction:column}
+  .route-leg{display:flex;align-items:stretch;gap:10px}
+  .leg-line{display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0}
+  .leg-dot-r{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .leg-dot-r.start{background:#5a8fd0}.leg-dot-r.mid{background:#333}.leg-dot-r.end{background:#5a8fd0}.leg-dot-r.dim{background:#1e1e1e}
+  .leg-connector{width:2px;background:#1c1c1c;flex:1;min-height:10px}
+  .leg-content{flex:1;padding-bottom:12px}
+  .leg-stop-name{font-size:12px;color:#aaa;line-height:1.4}
+  .leg-stop-name.bold{color:#f0ede6}.leg-stop-name.dim{color:#444}
+  .leg-dur-label{font-size:10px;color:#888;margin-top:3px;letter-spacing:.5px}
+  .error-box{background:#140000;border:1px solid #4a1010;border-radius:8px;padding:14px;margin-top:16px;font-size:12px;color:#cc4444;line-height:1.9}
+
+  /* ── AD BANNER ── */
+  .ad-banner{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0a0a0a;border-top:1px solid #1e1e1e;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:100%}
+  .ad-banner-inner{flex:1;background:#111;border:1px dashed #2a2a2a;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;min-height:52px}
+  .ad-tag{font-size:9px;color:#2a2a2a;letter-spacing:2px;border:1px solid #1e1e1e;padding:2px 5px;border-radius:3px;flex-shrink:0}
+  .ad-copy{font-size:12px;color:#2a2a2a;letter-spacing:1px}
+  .ad-cta{font-size:10px;color:#444;letter-spacing:1px;margin-left:auto;flex-shrink:0}
+
+  /* ── SEARCH COUNTER ── */
+  .search-counter{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:8px 12px;background:#131313;border:1px solid #1e1e1e;border-radius:7px}
+  .counter-text{font-size:10px;color:#444;letter-spacing:1.5px}
+  .counter-text span{color:#bb7700}
+  .counter-bar{height:2px;background:#1a1a1a;border-radius:1px;margin-top:5px;overflow:hidden}
+  .counter-fill{height:100%;background:#bb7700;border-radius:1px;transition:width 0.4s ease}
+
+  /* ── HAMBURGER MENU ── */
+  .hamburger-btn{background:none;border:1px solid #222;border-radius:7px;color:#666;font-size:16px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;flex-shrink:0}
+  .hamburger-btn:hover{border-color:#444;color:#ccc;background:#141414}
+  .hamburger-menu{position:fixed;inset:0;z-index:500}
+  .hamburger-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.6)}
+  .hamburger-panel{position:absolute;top:0;left:0;width:260px;height:100%;background:#111;border-right:1px solid #222;padding:0;display:flex;flex-direction:column}
+  .hamburger-header{padding:20px 20px 16px;border-bottom:1px solid #1e1e1e}
+  .hamburger-user-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:#e8e4dc;margin-bottom:2px}
+  .hamburger-user-sub{font-size:9px;color:#444;letter-spacing:2px}
+  .hamburger-avatar{width:44px;height:44px;border-radius:50%;background:#1e1e1e;border:1px solid #333;overflow:hidden;margin-bottom:12px;display:flex;align-items:center;justify-content:center;color:#555;font-size:18px}
+  .hamburger-avatar img{width:100%;height:100%;object-fit:cover}
+  .hamburger-points-block{margin:16px 20px;background:#141414;border:1px solid #222;border-radius:8px;padding:12px 14px}
+  .hamburger-points-label{font-size:9px;color:#555;letter-spacing:2px;margin-bottom:4px}
+  .hamburger-points-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:#bb7700}
+  .hamburger-points-bar{height:3px;background:#1a1a1a;border-radius:2px;margin-top:8px;overflow:hidden}
+  .hamburger-points-fill{height:100%;background:#bb7700;border-radius:2px;transition:width 0.4s ease}
+  .hamburger-close{position:absolute;top:14px;right:14px;background:none;border:none;color:#444;font-size:20px;cursor:pointer;padding:4px;line-height:1}
+  .hamburger-close:hover{color:#ccc}
+  
+  .history-block{margin:16px 20px 0; max-height:220px; overflow-y:auto}
+  .history-item{background:#181818; border:1px solid #222; border-radius:6px; padding:10px 12px; margin-bottom:8px; cursor:pointer; transition:all 0.15s}
+  .history-item:hover{border-color:#bb7700; background:#1e1e1e}
+  .history-item-name{font-size:10px; color:#aaa; letter-spacing:1px; margin-bottom:4px; font-weight:500}
+  .history-item-meta{font-size:9px; color:#444; letter-spacing:1px}
+
+  /* ── COLLAPSIBLE HEADER ── */
+  .input-section{transition:all 0.35s ease}
+  .input-section.collapsed{overflow:hidden}
+  .collapsed-summary{display:none;background:#141414;border:1px solid #242424;border-radius:8px;padding:12px 14px;cursor:pointer;transition:background 0.15s;margin-bottom:0}
+  .collapsed-summary:hover{background:#1a1a1a}
+  .collapsed-summary-row{display:flex;align-items:center;justify-content:space-between}
+  .collapsed-summary-stops{font-size:11px;color:#aaa;letter-spacing:1px;line-height:1.8}
+  .collapsed-expand-hint{font-size:9px;color:#444;letter-spacing:1.5px;flex-shrink:0;margin-left:10px}
+  .input-section.collapsed .collapsed-summary{display:block}
+  .input-section.collapsed .input-fields-inner{display:none}
+  .input-section.collapsed .search-action-row{display:none}
+
+  /* ── PROGRESS BELOW BUTTON ── */
+  .search-action-row{display:flex;flex-direction:column}
+
+  /* ── BEST CARD GLOW ── */
+  .route-card.best{border-color:#2563eb;background:#08101e;box-shadow:0 0 0 1px rgba(37,99,235,0.25),0 4px 24px rgba(37,99,235,0.15)}
+  .route-badge.best-badge{background:#2563eb}
+  .route-total.best-total{color:#5a8fd0}
+
+  /* ── WORST ACCORDION ── */
+  .worst-accordion{margin-bottom:10px}
+  .worst-toggle{width:100%;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:8px;padding:12px 16px;text-align:left;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;color:#555;letter-spacing:1.5px;display:flex;align-items:center;justify-content:space-between;transition:all 0.15s}
+  .worst-toggle:hover{background:#141414;color:#888;border-color:#2a2a2a}
+  .worst-toggle-arrow{font-size:10px;transition:transform 0.2s;color:#333}
+  .worst-toggle.open .worst-toggle-arrow{transform:rotate(180deg)}
+  .worst-body{display:none;margin-top:4px}
+  .worst-body.open{display:block}
+
+  /* ── LOCATION IN DROPDOWN ── */
+  .sug-loc-item{padding:9px 13px;font-size:12px;color:#5a8fd0;cursor:pointer;border-bottom:1px solid #1a1a1a;transition:background 0.1s;display:flex;align-items:center;gap:8px}
+  .sug-loc-item:hover{background:#1e1e1e;color:#82b0e8}
+  .sug-loc-icon{font-size:13px;flex-shrink:0}
+  .sug-loc-disabled{opacity:0.35;cursor:not-allowed;pointer-events:none}
+
+  /* ── AUTH UI ── */
+  .auth-overlay{position:fixed;inset:0;z-index:2000;background:#0d0d0d;display:flex;align-items:center;justify-content:center;padding:20px;flex-direction:column}
+  .auth-card{width:100%;max-width:380px;background:#111;border:1px solid #222;border-radius:14px;padding:32px 28px;text-align:center}
+  .auth-logo{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:5px;color:#e8e4dc;margin-bottom:4px}
+  .auth-logo span{color:#cc0000}
+  .auth-tagline{font-size:10px;color:#333;letter-spacing:2.5px;margin-bottom:28px}
+  .auth-country-label{font-size:9px;color:#555;letter-spacing:2px;text-align:left;margin-bottom:7px}
+  .auth-country-select{width:100%;background:#161616;border:1px solid #2a2a2a;border-radius:8px;color:#e8e4dc;font-family:'DM Mono',monospace;font-size:13px;padding:11px 32px 11px 13px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;color-scheme:dark;margin-bottom:20px;transition:border-color 0.15s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23555' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+  .auth-country-select:focus{border-color:#cc0000}
+  .auth-country-select option[value=""]{color:#444}
+  .auth-divider{font-size:9px;color:#222;letter-spacing:2px;margin:20px 0}
+  .google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:#fff;border:none;border-radius:8px;padding:13px 16px;cursor:pointer;transition:background 0.15s,opacity 0.15s;margin-bottom:0}
+  .google-btn:hover:not(:disabled){background:#f0f0f0}
+  .google-btn:disabled{opacity:0.35;cursor:not-allowed}
+  .google-btn svg{flex-shrink:0;width:20px;height:20px}
+  .google-btn-text{font-family:'DM Mono',monospace;font-size:13px;letter-spacing:1px;color:#1a1a1a;font-weight:500}
+  .skip-btn{width:100%;background:none;border:none;color:#2a2a2a;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;padding:16px;cursor:pointer;transition:color 0.15s;margin-top:4px}
+  .skip-btn:hover:not(:disabled){color:#555}
+  .skip-btn:disabled{color:#1e1e1e;cursor:not-allowed}
+  .auth-error{font-size:10px;color:#cc4444;letter-spacing:1px;margin-top:14px;min-height:14px}
+  /* top-bar for user pill */
+  .top-bar{display:flex;justify-content:flex-start;padding:10px 16px 0;min-height:28px}
+  /* Header user pill */
+  .auth-pill{display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:#141414;border:1px solid #1e1e1e;border-radius:20px;padding:4px 10px 4px 4px}
+  .auth-pill-avatar{width:18px;height:18px;border-radius:50%;background:#cc0000;overflow:hidden;flex-shrink:0}
+  .auth-pill-avatar img{width:100%;height:100%;object-fit:cover}
+  .auth-pill-name{font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1.5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .auth-pill-out{font-size:9px;color:rgba(255,255,255,0.2);letter-spacing:1px;margin-left:2px}
+  .auth-pill:hover .auth-pill-name{color:rgba(255,255,255,0.75)}
+  .auth-pill:hover .auth-pill-out{color:rgba(255,255,255,0.45)}
+  .ad-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;padding:20px}
+  .ad-modal{width:100%;max-width:400px;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden}
+  .ad-modal-header{background:#141414;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1a1a1a}
+  .ad-modal-tag{font-size:9px;color:#333;letter-spacing:2px}
+  .ad-countdown{font-family:'Bebas Neue',sans-serif;font-size:13px;color:#444;letter-spacing:2px}
+  .ad-modal-body{padding:0;aspect-ratio:4/3;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;position:relative;overflow:hidden}
+  .ad-placeholder-bg{position:absolute;inset:0;background:linear-gradient(135deg,#0f0f0f 0%,#151515 50%,#0f0f0f 100%)}
+  .ad-placeholder-content{position:relative;text-align:center;padding:20px}
+  .ad-brand{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:6px;color:#1e1e1e}
+  .ad-tagline{font-size:11px;color:#1a1a1a;letter-spacing:3px;margin-top:4px}
+  .ad-modal-footer{padding:14px 16px;border-top:1px solid #1a1a1a}
+  .ad-skip-btn{width:100%;padding:13px;background:#1a1a1a;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:3px;color:#2a2a2a;cursor:not-allowed;transition:all 0.3s}
+  .ad-skip-btn.ready{background:#2a8a2a;color:#fff;cursor:pointer}
+  .ad-skip-btn.ready:hover{background:#227022}
+  .ad-progress{height:2px;background:#1a1a1a;border-radius:1px;margin-bottom:10px;overflow:hidden}
+  .ad-progress-fill{height:100%;background:#cc0000;border-radius:1px;transition:width 0.1s linear}
+
+  /* ── AD CONFIRM MODAL ── */
+  .confirm-modal{width:100%;max-width:360px;background:#0e0e0e;border:1px solid #2a2a2a;border-radius:12px;padding:24px;text-align:center}
+  .confirm-icon{font-size:32px;margin-bottom:12px}
+  .confirm-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:#f0ede6;margin-bottom:8px}
+  .confirm-body{font-size:11px;color:#444;letter-spacing:1px;line-height:1.8;margin-bottom:20px}
+  .confirm-body strong{color:#aa6600}
+  .confirm-btns{display:flex;gap:8px}
+  .confirm-yes{flex:1;padding:13px;background:#2a8a2a;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#fff;cursor:pointer;transition:background 0.15s}
+  .confirm-yes:hover{background:#227022}
+  .confirm-no{flex:1;padding:13px;background:#141414;border:1px solid #2a2a2a;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#444;cursor:pointer;transition:all 0.15s}
+  .confirm-no:hover{border-color:#444;color:#888}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ── -->
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo"><span>FAST</span> ROUTES <span id="auth-ver-label" style="font-size:10px; opacity:0.3; letter-spacing:1px; vertical-align:middle; font-family:'DM Mono'"></span></div>
+    <div class="auth-tagline">FIND THE SHORTEST ORDER THROUGH ALL YOUR STOPS</div>
+
+    <div class="auth-country-label">YOUR CITY / COUNTRY</div>
+    <select class="auth-country-select" id="auth-country" onchange="onAuthCountryChange()">
+      <option value="">— Select your country —</option>
+      <option value="ARG">Argentina</option>
+      <option value="AUS">Australia</option>
+      <option value="AUT">🇦🇹 Austria (ÖBB)</option>
+      <option value="BEL">Belgium</option>
+      <option value="BRA">Brazil</option>
+      <option value="BGR">Bulgaria</option>
+      <option value="CAN">Canada</option>
+      <option value="CHN">China</option>
+      <option value="HRV">Croatia</option>
+      <option value="CZE">Czech Republic</option>
+      <option value="DNK">Denmark</option>
+      <option value="EGY">Egypt</option>
+      <option value="EST">Estonia</option>
+      <option value="FIN">Finland</option>
+      <option value="FRA">France</option>
+      <option value="DEU">Germany</option>
+      <option value="GRC">Greece</option>
+      <option value="HUN">Hungary</option>
+      <option value="ISL">Iceland</option>
+      <option value="IND">India</option>
+      <option value="IDN">Indonesia</option>
+      <option value="IRL">Ireland</option>
+      <option value="ISR">Israel</option>
+      <option value="ITA">Italy</option>
+      <option value="JPN">Japan</option>
+      <option value="JOR">Jordan</option>
+      <option value="KOR">South Korea</option>
+      <option value="LVA">Latvia</option>
+      <option value="LTU">Lithuania</option>
+      <option value="LUX">Luxembourg</option>
+      <option value="MYS">Malaysia</option>
+      <option value="MLT">Malta</option>
+      <option value="MEX">Mexico</option>
+      <option value="MAR">Morocco</option>
+      <option value="NLD">Netherlands</option>
+      <option value="NZL">New Zealand</option>
+      <option value="NOR">Norway</option>
+      <option value="POL">Poland</option>
+      <option value="PRT">Portugal</option>
+      <option value="ROU">Romania</option>
+      <option value="SGP">Singapore</option>
+      <option value="SVK">Slovakia</option>
+      <option value="SVN">Slovenia</option>
+      <option value="ZAF">South Africa</option>
+      <option value="ESP">Spain</option>
+      <option value="SWE">Sweden</option>
+      <option value="CHE">Switzerland</option>
+      <option value="THA">Thailand</option>
+      <option value="TUR">Turkey</option>
+      <option value="ARE">UAE</option>
+      <option value="GBR">United Kingdom</option>
+      <option value="USA">United States</option>
+      <option value="VNM">Vietnam</option>
+    </select>
+
+    <button class="google-btn" id="auth-google-btn" onclick="signInGoogle()" disabled>
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      <span class="google-btn-text">CONTINUE WITH GOOGLE</span>
+    </button>
+
+    <div id="auth-error" class="auth-error"></div>
+    <button class="skip-btn" id="auth-skip-btn" onclick="skipLogin()" disabled>SKIP FOR NOW →</button>
+  </div>
+</div>
+
+<div id="root">
+  <div class="top-bar">
+    <button class="hamburger-btn" onclick="openHamburger()" title="Menu">☰</button>
+  </div>
+
+  <!-- Hamburger Menu -->
+  <div class="hamburger-menu" id="hamburger-menu" style="display:none">
+    <div class="hamburger-backdrop" onclick="closeHamburger()"></div>
+    <div class="hamburger-panel">
+      <button class="hamburger-close" onclick="closeHamburger()">✕</button>
+      <div class="hamburger-header">
+        <div class="hamburger-avatar" id="hbg-avatar">👤</div>
+        <div class="hamburger-user-name" id="hbg-name">GUEST</div>
+        <div class="hamburger-user-sub" id="hbg-sub">NOT SIGNED IN</div>
+        <div id="auth-pill-slot" style="margin-top:12px"></div>
+      </div>
+      <div class="hamburger-points-block">
+        <div class="hamburger-points-label">POINTS REMAINING</div>
+        <div class="hamburger-points-val" id="hbg-pts">20</div>
+        <div class="hamburger-points-bar"><div class="hamburger-points-fill" id="hbg-pts-fill" style="width:100%"></div></div>
+      </div>
+      <div style="padding:0 20px; margin-top:10px">
+        <div class="hamburger-points-label">SETTINGS</div>
+        <div style="margin-top:8px">
+          <div style="font-size:9px; color:#333; letter-spacing:1px; margin-bottom:4px">REGION / TRANSIT SOURCE</div>
+          <select class="auth-country-select" id="hbg-country-select" onchange="onHbgCountryChange()" style="font-size:11px; padding:8px 10px; margin-bottom:0">
+            <option value="ARG">Argentina</option>
+            <option value="AUS">Australia</option>
+            <option value="AUT">🇦🇹 Austria (ÖBB)</option>
+            <option value="BEL">Belgium</option>
+            <option value="BRA">Brazil</option>
+            <option value="BGR">Bulgaria</option>
+            <option value="CAN">Canada</option>
+            <option value="CHN">China</option>
+            <option value="HRV">Croatia</option>
+            <option value="CZE">Czech Republic</option>
+            <option value="DNK">Denmark</option>
+            <option value="EGY">Egypt</option>
+            <option value="EST">Estonia</option>
+            <option value="FIN">Finland</option>
+            <option value="FRA">France</option>
+            <option value="DEU">Germany</option>
+            <option value="GRC">Greece</option>
+            <option value="HUN">Hungary</option>
+            <option value="ISL">Iceland</option>
+            <option value="IND">India</option>
+            <option value="IDN">Indonesia</option>
+            <option value="IRL">Ireland</option>
+            <option value="ISR">Israel</option>
+            <option value="ITA">Italy</option>
+            <option value="JPN">Japan</option>
+            <option value="JOR">Jordan</option>
+            <option value="KOR">South Korea</option>
+            <option value="LVA">Latvia</option>
+            <option value="LTU">Lithuania</option>
+            <option value="LUX">Luxembourg</option>
+            <option value="MYS">Malaysia</option>
+            <option value="MLT">Malta</option>
+            <option value="MEX">Mexico</option>
+            <option value="MAR">Morocco</option>
+            <option value="NLD">Netherlands</option>
+            <option value="NZL">New Zealand</option>
+            <option value="NOR">Norway</option>
+            <option value="POL">Poland</option>
+            <option value="PRT">Portugal</option>
+            <option value="ROU">Romania</option>
+            <option value="SGP">Singapore</option>
+            <option value="SVK">Slovakia</option>
+            <option value="SVN">Slovenia</option>
+            <option value="ZAF">South Africa</option>
+            <option value="ESP">Spain</option>
+            <option value="SWE">Sweden</option>
+            <option value="CHE">Switzerland</option>
+            <option value="THA">Thailand</option>
+            <option value="TUR">Turkey</option>
+            <option value="ARE">UAE</option>
+            <option value="GBR">United Kingdom</option>
+            <option value="USA">United States</option>
+            <option value="VNM">Vietnam</option>
+          </select>
+        </div>
+      </div>
+      <div style="padding:0 20px; margin-top:16px">
+        <div class="hamburger-points-label">HISTORY</div>
+        <div id="history-list" class="history-block" style="margin:8px 0 0; max-height:280px">
+          <div style="font-size:9px; color:#333; letter-spacing:1px; text-align:center; margin-top:10px">NO RECENT SEARCHES</div>
+        </div>
+      </div>
+      <div style="margin-top:auto; padding:20px; border-top:1px solid #1e1e1e; text-align:center">
+        <div id="hbg-ver-label" style="font-size:9px; color:#333; letter-spacing:2px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- Collapsible input section -->
+    <div class="input-section" id="input-section">
+      <!-- Collapsed summary (shown after search) -->
+      <div class="collapsed-summary" onclick="expandInputSection()" id="collapsed-summary">
+        <div class="collapsed-summary-row">
+          <div class="collapsed-summary-stops" id="collapsed-summary-text">—</div>
+          <div class="collapsed-expand-hint">TAP TO EDIT ↑</div>
+        </div>
+      </div>
+
+      <!-- Full input fields -->
+      <div class="input-fields-inner">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: -10px;">
+          <button id="manual-collapse-btn" onclick="manualCollapse()" style="display:none; background:none; border:none; color:#444; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px; cursor:pointer; padding:10px;">COLLAPSE ↑</button>
+        </div>
+        <!-- Departure -->
+        <div class="two-col" style="margin-bottom:0">
+          <div class="dt-wrap">
+            <div class="dt-label">DEPARTURE DATE</div>
+            <input type="date" id="dep-date" class="dt-input" onchange="saveAppState()">
+          </div>
+          <div class="dt-wrap">
+            <div class="dt-label">TIME</div>
+            <input type="time" id="dep-time" class="dt-input" onchange="saveAppState()">
+          </div>
+        </div>
+
+        <!-- Start -->
+        <div class="section-label red">STARTING POINT</div>
+        <div id="start-slot"></div>
+
+        <!-- Middle stops -->
+        <div class="section-label grey" style="margin-top:14px">
+          STOPS <span class="section-note">ORDER WILL BE OPTIMIZED</span>
+        </div>
+        <div id="stops-list"></div>
+        <button class="add-stop-btn" onclick="addStop()">＋ ADD STOP</button>
+
+        <!-- End -->
+        <div class="section-label green" style="margin-top:18px">
+          ENDING POINT <span class="section-note">OPTIONAL — LEAVE EMPTY TO NOT FIX</span>
+        </div>
+        <div id="end-slot"></div>
+      </div><!-- /input-fields-inner -->
+
+      <!-- Action row: button + progress -->
+      <div class="search-action-row">
+        <button class="btn" id="search-btn" onclick="doSearch()">FIND SHORTEST ROUTE</button>
+        <div id="progress" style="display:none"></div>
+      </div>
+    </div><!-- /input-section -->
+
+    <div id="results"></div>
+  
+  <!-- Ad Banner -->
+  <div class="ad-banner" id="ad-banner">
+    <div class="ad-banner-inner">
+      <span class="ad-tag">AD</span>
+      <span class="ad-copy">YOUR ADVERTISEMENT HERE</span>
+      <span class="ad-cta">LEARN MORE →</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────
+const APP_VERSION = "0.5.13";
+const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
+
+// ... rest of config ...
+
+
+// ÖBB HAFAS (Austria only)
+const PROXY   = "https://rough-band-354c.yyoouu99-yy.workers.dev/?url=";
+const GATE    = "https://fahrplan.oebb.at/gate";
+const WRAPPER = {
+  id:"p6mifqmq4stvhj4s",ver:"1.88",lang:"eng",
+  auth:{type:"AID",aid:"5vHavmuWPWIfetEe"},
+  client:{id:"OEBB",type:"WEB",name:"webapp",l:"vs_webapp",v:21901},
+  formatted:false,ext:"OEBB.14"
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let userCountry   = localStorage.getItem("userCountry") || "";
+let currentSource = localStorage.getItem("currentSource") || "here";
+let startStop = {id:"start",resolved:null,inputVal:""};
+let endStop   = {id:"end",  resolved:null,inputVal:""};
+let midStops  = [];
+let stopCtr   = 0;
+let sugTimers = {};
+let searching = false;
+let dragSrc   = null;
+let stopRequested = false;
+let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+let locationStopIds = new Set(); // track which stopIds used "my location"
+let lastResults = null;
+let lastFixedEnd = false;
+
+const STATE_KEY = "fastRoutesAppState";
+
+function saveAppState() {
+  const isCollapsed = document.getElementById("input-section").classList.contains("collapsed");
+  // Prune lastResults to avoid localStorage limits
+  let prunedResults = null;
+  if (lastResults && lastResults.length > 0) {
+    prunedResults = lastResults.length > 1 ? [lastResults[0], lastResults[lastResults.length - 1]] : [lastResults[0]];
+  }
+  const state = {
+    startStop,
+    endStop,
+    midStops,
+    stopCtr,
+    locationStopIds: Array.from(locationStopIds),
+    depDate: document.getElementById("dep-date").value,
+    depTime: document.getElementById("dep-time").value,
+    lastResults: prunedResults,
+    lastResultsCount: lastResults ? lastResults.length : 0,
+    lastFixedEnd,
+    isCollapsed
+  };
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+}
+
+function loadAppState() {
+  const saved = localStorage.getItem(STATE_KEY);
+  if (saved) {
+    try {
+      const state = JSON.parse(saved);
+      startStop = state.startStop || startStop;
+      endStop = state.endStop || endStop;
+      midStops = state.midStops || [];
+      stopCtr = state.stopCtr || 0;
+      locationStopIds = new Set(state.locationStopIds || []);
+      if (state.depDate) document.getElementById("dep-date").value = state.depDate;
+      if (state.depTime) document.getElementById("dep-time").value = state.depTime;
+      lastResults = state.lastResults || null;
+      lastFixedEnd = state.lastFixedEnd || false;
+      const lastResultsCount = state.lastResultsCount || (lastResults ? lastResults.length : 0);
+      
+      if (lastResults) {
+        renderResults(lastResults, lastFixedEnd, lastResultsCount, true);
+        if (state.isCollapsed) {
+          collapseInputSection(lastResults[0]);
+        } else {
+          expandInputSection();
+        }
+      }
+    } catch (e) { console.error("Failed to load app state", e); }
+  }
+
+  if (midStops.length === 0) {
+    addStop(false); addStop(false);
+  }
+  renderAll();
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────
+(function init(){
+  const now=new Date(),pad=n=>String(n).padStart(2,"0");
+  document.getElementById("dep-date").value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById("dep-time").value=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  
+  // Set version strings
+  document.getElementById("auth-ver-label").textContent = `v${APP_VERSION}`;
+  document.getElementById("hbg-ver-label").textContent = `VERSION ${APP_VERSION}`;
+
+  // Sync dropdowns with saved state
+  if (userCountry || currentSource === "obb") {
+    const val = currentSource === "obb" ? "AUT" : userCountry;
+    const authSelect = document.getElementById("auth-country");
+    const hbgSelect  = document.getElementById("hbg-country-select");
+    if (authSelect) authSelect.value = val;
+    if (hbgSelect)  hbgSelect.value = val;
+    onAuthCountryChange();
+    showApp(); // Hide sign-in if already chosen
+  }
+
+  loadAppState();
+  renderHistory();
+})();
+
+// ── HISTORY ───────────────────────────────────────────────────────────
+function saveToHistory(ranked, isStopped = false) {
+  let first = "?", last = "?", prunedRanked = [], totalComputed = 0;
+  
+  if (ranked && ranked.length > 0) {
+    const best = ranked[0];
+    first = best.route[0].resolved?.name || "?";
+    last = best.route[best.route.length - 1].resolved?.name || "?";
+    // Prune ranked results for history storage to avoid "Invalid string length" / localStorage limits
+    prunedRanked = ranked.length > 1 ? [ranked[0], ranked[ranked.length - 1]] : [ranked[0]];
+    totalComputed = ranked.length;
+  } else {
+    first = startStop.resolved?.name || (midStops.find(m=>m.resolved)?.resolved?.name) || "?";
+    last = endStop.resolved?.name || ([...midStops].reverse().find(m=>m.resolved)?.resolved?.name) || "?";
+  }
+
+  const entry = {
+    name: `${first.split(/[,–-]/)[0].trim()} → ${last.split(/[,–-]/)[0].trim()}`,
+    date: document.getElementById("dep-date").value,
+    time: document.getElementById("dep-time").value,
+    startStop: JSON.parse(JSON.stringify(startStop)),
+    midStops: JSON.parse(JSON.stringify(midStops)),
+    endStop: JSON.parse(JSON.stringify(endStop)),
+    ranked: prunedRanked,
+    totalComputed: totalComputed,
+    isStopped: isStopped,
+    timestamp: Date.now(),
+    userCountry: userCountry,
+    currentSource: currentSource
+  };
+
+  searchHistory.unshift(entry);
+  if (searchHistory.length > 20) searchHistory.pop();
+  localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  if (!list) return;
+  if (searchHistory.length === 0) {
+    list.innerHTML = `<div style="font-size:9px; color:#333; letter-spacing:1px; text-align:center; margin-top:10px">NO RECENT SEARCHES</div>`;
+    return;
+  }
+  list.innerHTML = searchHistory.map((item, i) => `
+    <div class="history-item" onclick="loadHistoryItem(${i})">
+      <div class="history-item-name">${item.isStopped ? '<span style="color:#cc4444">[STOPPED] </span>' : ''}${esc(item.name)}</div>
+      <div class="history-item-meta">${item.date} @ ${item.time} · ${item.isStopped ? 'No results' : (item.ranked[0]?.route?.length || 0) + ' stops'}</div>
+    </div>
+  `).join("");
+}
+
+let pendingHistoryItem = null;
+
+function loadHistoryItem(index) {
+  const item = searchHistory[index];
+  if (!item) return;
+
+  const currentRegion = getRegionDisplayName(userCountry, currentSource);
+  const targetRegion = getRegionDisplayName(item.userCountry, item.currentSource);
+
+  if (item.currentSource !== currentSource || (item.currentSource === "here" && item.userCountry !== userCountry)) {
+    pendingHistoryItem = item;
+    document.getElementById("hist-conf-new").textContent = targetRegion;
+    document.getElementById("hist-conf-curr").textContent = currentRegion;
+    document.getElementById("history-confirm-modal").style.display = "flex";
+    return;
+  }
+
+  applyHistoryItem(item);
+}
+
+function onHistConfirmYes() {
+  document.getElementById("history-confirm-modal").style.display = "none";
+  if (pendingHistoryItem) {
+    const item = pendingHistoryItem;
+    userCountry = item.userCountry;
+    currentSource = item.currentSource;
+    localStorage.setItem("userCountry", userCountry);
+    localStorage.setItem("currentSource", currentSource);
+    
+    // Sync dropdowns
+    const val = currentSource === "obb" ? "AUT" : userCountry;
+    const authSelect = document.getElementById("auth-country");
+    const hbgSelect  = document.getElementById("hbg-country-select");
+    if (authSelect) authSelect.value = val;
+    if (hbgSelect)  hbgSelect.value = val;
+
+    applyHistoryItem(item);
+    pendingHistoryItem = null;
+  }
+}
+
+function onHistConfirmNo() {
+  document.getElementById("history-confirm-modal").style.display = "none";
+  pendingHistoryItem = null;
+}
+
+function applyHistoryItem(item) {
+  document.getElementById("dep-date").value = item.date;
+  document.getElementById("dep-time").value = item.time;
+  startStop = JSON.parse(JSON.stringify(item.startStop));
+  midStops = JSON.parse(JSON.stringify(item.midStops));
+  endStop = JSON.parse(JSON.stringify(item.endStop));
+
+  renderAll();
+  saveAppState();
+  if (item.isStopped) {
+    showErr("This search was stopped before completion.");
+    expandInputSection();
+  } else {
+    renderResults(item.ranked, !!endStop.resolved, item.totalComputed);
+  }
+  closeHamburger();
+}
+
+function onHbgCountryChange() {
+  const val = document.getElementById("hbg-country-select").value;
+  if (!val) return;
+  userCountry   = val === "AUT" ? "" : val;
+  currentSource = val === "AUT" ? "obb" : "here";
+  localStorage.setItem("userCountry", userCountry);
+  localStorage.setItem("currentSource", currentSource);
+  // Also sync the login screen dropdown just in case
+  const authSelect = document.getElementById("auth-country");
+  if (authSelect) authSelect.value = val;
+  resetResolution();
+  saveAppState();
+}
+
+function resetResolution() {
+  const clear = s => { s.resolved = null; };
+  clear(startStop);
+  midStops.forEach(clear);
+  clear(endStop);
+  renderAll();
+  saveAppState();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────
+function renderAll(){
+  renderSlot("start-slot",startStop,"neutral","e.g. Paris Gare du Nord…",true,"start",null);
+  renderMidList();
+  renderSlot("end-slot",endStop,"neutral","e.g. Tokyo Station…",true,"end",null);
+  updateSearchBtn();
+}
+function renderSlot(cId,stopObj,dotColor,ph,canRemove,section,stopId){
+  document.getElementById(cId).innerHTML=makeStopRow(stopObj,dotColor,ph,canRemove,section,stopId);
+}
+function renderMidList(){
+  document.getElementById("stops-list").innerHTML=midStops.map((s,i)=>
+    makeStopRow(s,"grey",`Stop ${i+1}…`,true,"mid",s.id)).join("");
+}
+function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
+  const sid=stopId!==null?stopId:"null";
+  return `<div class="stop-row" id="row-${s.id}" draggable="true"
+    ondragstart="onDragStart(event,'${section}',${sid})"
+    ondragover="onDragOver(event)" ondrop="onDrop(event,'${section}',${sid})"
+    ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)">
+    <div class="drag-handle" title="Drag to reorder">⠿</div>
+    <div class="stop-input-wrap">
+      <input class="stop-input${s.resolved?" resolved":""}" id="inp-${s.id}"
+        type="text" placeholder="${ph}" autocomplete="off" spellcheck="false"
+        value="${esc(s.inputVal)}" maxlength="100"
+        oninput="onInput('${s.id}',this.value,${section==='mid'})"
+        onkeydown="onKeydown(event,'${s.id}')"
+        onfocus="onInputFocus('${s.id}')"
+        onblur="onInputBlur('${s.id}')">
+      <div class="stop-check${s.resolved?" visible":""}" id="lbl-${s.id}">✓</div>
+      <div class="suggestions" id="sug-${s.id}" style="display:none"></div>
+    </div>
+    ${canRemove
+      ?(section==='mid'
+        ?`<button class="remove-btn" onclick="removeOrClearMid(${s.id})">×</button>`
+        :`<button class="remove-btn" onclick="clearSlot('${section}')">×</button>`)
+      :`<div class="remove-spacer"></div>`}
+  </div>`;
+}
+
+// ── MIDDLE STOPS ──────────────────────────────────────────────────────
+function addStop(doFocus = true){
+  const id=++stopCtr;
+  midStops.push({id,resolved:null,inputVal:""});
+  renderMidList();
+  saveAppState();
+  if(doFocus) setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
+}
+function removeStop(id){
+  if(midStops.length<=1)return;
+  midStops=midStops.filter(s=>s.id!==Number(id));
+  locationStopIds.delete(Number(id));
+  renderMidList();
+  updateLocationButtons();
+  saveAppState();
+}
+// If only one mid stop left: clear it. If multiple: delete it.
+function removeOrClearMid(id){
+  if(midStops.length>1){
+    removeStop(id);
+  } else {
+    const s=midStops[0];
+    clearStopObj(s);
+    locationStopIds.delete(s.id);
+    renderMidList();
+    updateLocationButtons();
+    saveAppState();
+  }
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────
+function onDragStart(e,section,stopId){
+  dragSrc={section,id:stopId};e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",section);
+  const rowId=section==='start'?startStop.id:section==='end'?endStop.id:stopId;
+  setTimeout(()=>{const row=document.getElementById(`row-${rowId}`);if(row){row.classList.add("dragging");if(section==='start'||section==='end')row.classList.add("drag-src-anchor");}},0);
+}
+function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect="move";document.querySelectorAll(".stop-row").forEach(r=>r.classList.remove("drag-over"));e.currentTarget.classList.add("drag-over");}
+function onDragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))e.currentTarget.classList.remove("drag-over");}
+function onDrop(e,tgtSection,tgtId){
+  e.preventDefault();clearDragClasses();if(!dragSrc)return;
+  const{section:src,id:srcId}=dragSrc;dragSrc=null;
+  if(src==='start'){
+    if(tgtSection==='end'){const t=snap(startStop);copyInto(startStop,endStop);copyInto(endStop,t);renderAll();saveAppState();return;}
+    if(tgtSection==='mid'&&(startStop.resolved||startStop.inputVal.trim())){const ti=midStops.findIndex(s=>s.id===tgtId);midStops.splice(ti,0,{id:++stopCtr,resolved:startStop.resolved,inputVal:startStop.inputVal});}
+    clearStopObj(startStop);renderAll();saveAppState();return;
+  }
+  if(src==='end'){
+    if(tgtSection==='start'){const t=snap(endStop);copyInto(endStop,startStop);copyInto(startStop,t);renderAll();saveAppState();return;}
+    if(tgtSection==='mid'&&(endStop.resolved||endStop.inputVal.trim())){const ti=midStops.findIndex(s=>s.id===tgtId);midStops.splice(ti,0,{id:++stopCtr,resolved:endStop.resolved,inputVal:endStop.inputVal});}
+    clearStopObj(endStop);renderAll();saveAppState();return;
+  }
+  const sm=midStops.find(s=>s.id===srcId);if(!sm)return;
+  if(tgtSection==='start'){const e2=!startStop.resolved&&!startStop.inputVal.trim();const os=snap(startStop);copyInto(startStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,os);renderAll();saveAppState();return;}
+  if(tgtSection==='end'){const e2=!endStop.resolved&&!endStop.inputVal.trim();const oe=snap(endStop);copyInto(endStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,oe);renderAll();saveAppState();return;}
+  if(tgtSection==='mid'&&srcId!==tgtId){const si=midStops.findIndex(s=>s.id===srcId);const ti=midStops.findIndex(s=>s.id===tgtId);if(si===-1||ti===-1)return;const[item]=midStops.splice(si,1);midStops.splice(si<ti?ti-1:ti,0,item);renderMidList();saveAppState();}
+}
+function onDragEnd(){dragSrc=null;clearDragClasses();}
+function clearDragClasses(){document.querySelectorAll(".stop-row").forEach(r=>r.classList.remove("drag-over","dragging","drag-src-anchor"));}
+function snap(s){return{resolved:s.resolved,inputVal:s.inputVal};}
+function copyInto(d,s){d.resolved=s.resolved;d.inputVal=s.inputVal;}
+function clearStopObj(s){s.resolved=null;s.inputVal="";}
+function clearSlot(section){
+  if(section==='start'){
+    locationStopIds.delete("start");
+    clearStopObj(startStop);
+    renderSlot("start-slot",startStop,"neutral","e.g. Paris Gare du Nord…",true,"start",null);
+  } else {
+    locationStopIds.delete("end");
+    clearStopObj(endStop);
+    renderSlot("end-slot",endStop,"neutral","e.g. Tokyo Station…",true,"end",null);
+  }
+  updateLocationButtons();
+  saveAppState();
+}
+
+// ── INPUT / AUTOCOMPLETE ──────────────────────────────────────────────
+function getStopObj(id){if(id==="start")return startStop;if(id==="end")return endStop;return midStops.find(s=>s.id===Number(id));}
+function onInput(id,val,isMid){
+  const s=getStopObj(id);if(!s)return;
+  s.inputVal=val;s.resolved=null;
+  const inp=document.getElementById(`inp-${id}`);
+  if(inp){
+    inp.classList.remove("resolved");
+    inp.classList.remove("invalid");
+  }
+  const lbl=document.getElementById(`lbl-${id}`);if(lbl){lbl.className="stop-check";}
+  hideSug(id);clearTimeout(sugTimers[id]);
+  updateSearchBtn();
+  saveAppState();
+  if(val.trim().length<2){
+    // show dropdown with just the location option immediately
+    showSug(id,[],isMid);
+    return;
+  }
+  sugTimers[id]=setTimeout(async()=>{try{showSug(id,await locMatch(val.trim()),isMid);}catch{showSug(id,[],isMid);}},320);
+}
+function onInputFocus(id) {
+  const s = getStopObj(id);
+  if (s) {
+    const isMid = midStops.some(ms=>ms.id===Number(id)||ms.id===id);
+    showSug(id, [], isMid);
+  }
+}
+function onInputBlur(id) {
+  setTimeout(() => { hideSug(id); }, 200);
+}
+function onKeydown(e,id){
+  const box=document.getElementById(`sug-${id}`);const items=box?.querySelectorAll(".sug-item")||[];let sel=box?.querySelector(".sug-item.sel");
+  if(e.key==="ArrowDown"){e.preventDefault();const n=sel?sel.nextElementSibling:items[0];sel?.classList.remove("sel");n?.classList.add("sel");}
+  else if(e.key==="ArrowUp"){e.preventDefault();const p=sel?.previousElementSibling;sel?.classList.remove("sel");p?.classList.add("sel");}
+  else if(e.key==="Enter"){sel?sel.click():hideSug(id);}
+  else if(e.key==="Escape"){hideSug(id);}
+}
+function showSug(id,locs,isMid){
+  const box=document.getElementById(`sug-${id}`);if(!box)return;
+  const tl=t=>({locality:"city",administrativeArea:"region",street:"street",houseNumber:"address",place:"place",transit:"transit",S:"station",A:"address",P:"POI"}[t]||t||"");
+  const atMax = locationStopIds.size >= MAX_LOC_STOPS;
+  const sidKey = isNaN(id) ? id : Number(id);
+  const isActive = locationStopIds.has(sidKey) || locationStopIds.has(id);
+  const locDisabled = atMax && !isActive;
+  const locItem = `<div class="sug-loc-item${locDisabled?' sug-loc-disabled':''}" id="sug-loc-${id}"><span class="sug-loc-icon">📍</span>${isActive?'CLEAR MY LOCATION':'USE MY CURRENT LOCATION'}</div>`;
+  const sugItems = locs.length ? locs.map((loc,i)=>`<div class="sug-item" data-i="${i}">${esc(loc.name)}<span class="sug-type">${tl(loc.type)}</span></div>`).join("") : "";
+  if(!locItem && !sugItems){box.style.display="none";return;}
+  box.innerHTML = locItem + sugItems;
+  box.style.display="block";
+  const locEl = document.getElementById(`sug-loc-${id}`);
+  if(locEl && !locDisabled) locEl.addEventListener("mousedown",(e)=>{e.preventDefault();useCurrentLocation(id);hideSug(id);});
+  box.querySelectorAll(".sug-item").forEach((el,i)=>el.addEventListener("mousedown",(e)=>{e.preventDefault();pickStop(id,locs[i],isMid);}));
+}
+function pickStop(id,loc,isMid){
+  const s=getStopObj(id);if(!s)return;
+  // HERE uses lat/lng; ÖBB uses lid
+  s.resolved=currentSource==="here"?{lat:loc.lat,lng:loc.lng,name:loc.name}:{lid:loc.lid,name:loc.name};
+  s.inputVal=loc.name;
+  const inp=document.getElementById(`inp-${id}`);const lbl=document.getElementById(`lbl-${id}`);
+  if(inp){inp.value=loc.name;inp.classList.add("resolved");}
+  if(lbl){lbl.className="stop-check visible";}
+  hideSug(id);
+  updateSearchBtn();
+  saveAppState();
+}
+function hideSug(id){const el=document.getElementById(`sug-${id}`);if(el){el.style.display="none";el.innerHTML="";}}
+document.addEventListener("click",e=>{
+  ["start","end",...midStops.map(s=>s.id)].forEach(id=>{
+    const inp=document.getElementById(`inp-${id}`);const sug=document.getElementById(`sug-${id}`);
+    if(inp&&sug&&!inp.contains(e.target)&&!sug.contains(e.target))hideSug(id);
+  });
+});
+
+// ── HERE API ──────────────────────────────────────────────────────────
+async function locMatchHERE(query){
+  let url=`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(query)}&limit=8&apiKey=${HERE_KEY}`;
+  if(userCountry) url+=`&in=countryCode:${userCountry}`;
+  const r=await fetch(url);if(!r.ok)throw new Error(`Geocode HTTP ${r.status}`);
+  const d=await r.json();
+  return(d.items||[]).map(item=>({name:item.title,lat:item.position.lat,lng:item.position.lng,type:item.resultType}));
+}
+
+async function getMinutesHERE(fromLat,fromLng,fromName,toLat,toLng,toName){
+  const dv=document.getElementById("dep-date").value,tv=document.getElementById("dep-time").value;
+  const depTime=(dv&&tv)?`${dv}T${tv}:00`:new Date().toISOString().slice(0,19);
+  const url=`https://transit.router.hereapi.com/v8/routes?origin=${fromLat},${fromLng}&destination=${toLat},${toLng}&departureTime=${encodeURIComponent(depTime)}&return=travelSummary&apiKey=${HERE_KEY}`;
+  const r=await fetch(url);if(!r.ok)throw new Error(`Transit HTTP ${r.status}`);
+  const d=await r.json();
+  const routes=d.routes||[];if(!routes.length)throw new Error(`No connections: ${fromName} → ${toName}`);
+  const durs=routes.map(rt=>rt.sections?.reduce((s,sec)=>s+(sec.travelSummary?.duration||0),0)||0).filter(x=>x>0);
+  if(!durs.length)throw new Error("Could not parse durations");
+  return Math.round(Math.min(...durs)/60);
+}
+
+// ── ÖBB HAFAS API ─────────────────────────────────────────────────────
+async function hafas(svcReqL){
+  const r=await fetch(PROXY+encodeURIComponent(`${GATE}?rnd=${Date.now()}`),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...WRAPPER,svcReqL})});
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();
+}
+async function locMatchOBB(name){
+  const d=await hafas([{meth:"LocMatch",req:{input:{loc:{type:"ALL",name},maxLoc:8,field:"S"}}}]);
+  const r=d.svcResL?.[0];if(!r||r.err!=="OK")throw new Error(r?.errTxt||r?.err||"LocMatch failed");
+  return r.res.match.locL||[];
+}
+async function getMinutesOBB(fromLid,fromName,toLid,toName){
+  const pad=n=>String(n).padStart(2,"0");const now=new Date();
+  const dv=document.getElementById("dep-date").value,tv=document.getElementById("dep-time").value;
+  const outDate=dv?dv.replace(/-/g,""):`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+  const outTime=tv?tv.replace(":","")+"00":`${pad(now.getHours())}${pad(now.getMinutes())}00`;
+  const d=await hafas([{meth:"TripSearch",id:"1|1|",req:{depLocL:[{lid:fromLid,name:fromName}],arrLocL:[{lid:toLid,name:toName}],outDate,outTime,outFrwd:true,maxChg:"1000",minChgTime:"-1",liveSearch:false,jnyFltrL:[{type:"PROD",mode:"INC",value:15359}],gisFltrL:[{type:"P",mode:"FB",profile:{type:"F",enabled:true,maxdist:"2000"}},{type:"M",mode:"FBT",meta:"foot_speed_normal"},{type:"P",mode:"FB",profile:{type:"B",enabled:false,maxdist:"0"}},{type:"M",mode:"FBT",meta:"bike_speed_normal"}],getPolyline:false,getPasslist:false,getTariff:false}}]);
+  const r=d.svcResL?.[0];if(!r||r.err!=="OK")throw new Error(r?.errTxt||r?.err||"TripSearch failed");
+  const conns=r.res.outConL||[];if(!conns.length)throw new Error("No connections");
+  const hhmm=t=>{const s=t.padStart(6,"0");return parseInt(s.slice(0,2))*60+parseInt(s.slice(2,4));};
+  const durs=conns.map(c=>{const dep=c.dep?.dTimeS||c.dep?.dTimeR||"",arr=c.arr?.aTimeS||c.arr?.aTimeR||"";if(!dep||!arr)return 0;let dm=hhmm(dep),am=hhmm(arr);if(am<=dm)am+=1440;return am-dm;}).filter(x=>x>0);
+  if(!durs.length)throw new Error("Could not parse durations");
+  return Math.min(...durs);
+}
+
+// ── UNIFIED DISPATCH ──────────────────────────────────────────────────
+async function locMatch(query){return currentSource==="obb"?locMatchOBB(query):locMatchHERE(query);}
+async function getMinutesForPair(a,b){
+  return currentSource==="obb"
+    ?getMinutesOBB(a.resolved.lid,a.resolved.name,b.resolved.lid,b.resolved.name)
+    :getMinutesHERE(a.resolved.lat,a.resolved.lng,a.resolved.name,b.resolved.lat,b.resolved.lng,b.resolved.name);
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────
+async function doSearch(){
+  const btn=document.getElementById("search-btn");
+  if(searching){if(confirm("Stop the current search?")){stopRequested=true;btn.innerHTML="STOPPING…";btn.disabled=true;}return;}
+
+  if (!currentSource || (currentSource === "here" && !userCountry)) {
+    showErr("Please choose your city / country in the menu first.");
+    return;
+  }
+
+  const prog=document.getElementById("progress"),res=document.getElementById("results");
+  res.innerHTML="";prog.style.display="none";
+  document.querySelectorAll(".stop-input").forEach(el => el.classList.remove("invalid"));
+
+  const unresolved = [];
+  const check = s => {
+    if (s.inputVal.trim().length > 0 && !s.resolved) {
+      unresolved.push(s.id);
+      return true;
+    }
+    return false;
+  };
+  check(startStop); midStops.forEach(check); check(endStop);
+
+  if (unresolved.length > 0) {
+    unresolved.forEach(id => document.getElementById(`inp-${id}`)?.classList.add("invalid"));
+    showErr("One or more stops are not validated. Please select a suggestion from the list.");
+    return;
+  }
+
+  const hasStart=!!startStop.resolved,validMids=midStops.filter(s=>s.resolved),fixedEnd=endStop.resolved||null;
+  const total=(hasStart?1:0)+validMids.length+(fixedEnd?1:0);
+  if(validMids.length===0){showErr("Please enter at least one stop.");return;}
+  if(total<2){showErr("Please enter at least 2 locations to plan a route.");return;}
+
+  // Freemium gate — cost = number of resolved stops, only charged after validation
+  const searchCost = total;
+  const allowed = await freemiumGate(searchCost);
+  if (!allowed) return;
+
+  stopRequested=false;searching=true;
+  btn.innerHTML="STOP SEARCHING";btn.classList.add("stopping");btn.disabled=false;
+  // Expand input section while searching so user can see the stop button
+  expandInputSection();
+
+  try{
+    const pairs=[],seen=new Set();
+    const addPair=(a,b)=>{const k=`${a.id}→${b.id}`;if(!seen.has(k)){seen.add(k);pairs.push([a,b]);}};
+    if(hasStart){
+      if(validMids.length===1){addPair(startStop,validMids[0]);if(fixedEnd)addPair(validMids[0],{id:"end",resolved:fixedEnd});}
+      else{for(const m of validMids){addPair(startStop,m);if(fixedEnd)addPair(m,{id:"end",resolved:fixedEnd});for(const n of validMids)if(m.id!==n.id)addPair(m,n);}}
+    }else{for(const m of validMids){if(fixedEnd)addPair(m,{id:"end",resolved:fixedEnd});for(const n of validMids)if(m.id!==n.id)addPair(m,n);}}
+
+    const cache={};prog.style.display="block";
+    for(let i=0;i<pairs.length;i++){
+      if(stopRequested)break;
+      const[a,b]=pairs[i];
+      if(!a.resolved||!b.resolved){cache[`${a.id}→${b.id}`]=Infinity;continue;}
+      setProgress(i,pairs.length,`${a.resolved.name} → ${b.resolved.name}`);
+      try{cache[`${a.id}→${b.id}`]=await getMinutesForPair(a,b);}catch{cache[`${a.id}→${b.id}`]=Infinity;}
+      if(i<pairs.length-1)await sleep(300);
+    }
+    setProgress(pairs.length,pairs.length,"Finding best order…");
+
+    if(stopRequested){
+      saveToHistory(null, true);
+      showErr("Search was stopped.");
+      return;
+    }
+
+    const perms=permute(validMids),endRef=fixedEnd?{id:"end",resolved:fixedEnd}:null;
+    const ranked=perms.map(perm=>{
+      const route=hasStart?[startStop,...perm,...(endRef?[endRef]:[])]:[ ...perm,...(endRef?[endRef]:[])];
+      let tot=0;const legs=[];
+      for(let i=0;i<route.length-1;i++){const m=cache[`${route[i].id}→${route[i+1].id}`]??Infinity;if(m===Infinity)return null;tot+=m;legs.push({from:route[i],to:route[i+1],mins:m});}
+      return{route,total:tot,legs};
+    }).filter(Boolean).sort((a,b)=>a.total-b.total);
+
+    prog.style.display="none";
+    if(stopRequested){
+      saveToHistory(null, true);
+      showErr("Search was stopped.");
+      return;
+    }
+    if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
+    renderResults(ranked,!!fixedEnd,ranked.length);
+    saveToHistory(ranked);
+  }catch(e){showErr(e.message);}
+  finally{searching=false;stopRequested=false;updateSearchBtn();btn.classList.remove("stopping");btn.disabled=false;prog.style.display="none";}
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────
+function buildRouteCard(r,hasFixedEnd,isBest){
+  const cc=isBest?"best":"worst",bc=isBest?"best-badge":"worst-badge",bt=isBest?"⚡ SHORTEST ORDER":"🐌 LONGEST ORDER",tc=isBest?"best-total":"worst-total";
+  let html=`<div class="route-card ${cc}"><div class="route-badge ${bc}">${bt}</div><div class="route-total ${tc}">${fmtDur(r.total)}<span class="unit">total travel</span></div><div class="route-stops">`;
+  r.legs.forEach((leg,i)=>{const f=i===0,dc=isBest?(f?"start":"mid"):"dim",nc=isBest?(f?" bold":""):" dim";html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${dc}"></div><div class="leg-connector"></div></div><div class="leg-content"><div class="leg-stop-name${nc}">${esc(leg.from.resolved?.name??"—")}</div><div class="leg-dur-label">↓ ${fmtDur(leg.mins)}</div></div></div>`;});
+  const last=r.route[r.route.length-1],ld=isBest?(hasFixedEnd?"end":"mid"):"dim",ln=isBest?" bold":" dim";
+  html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${ld}"></div></div><div class="leg-content"><div class="leg-stop-name${ln}">${esc(last.resolved?.name??"—")}</div></div></div></div></div>`;
+  return html;
+}
+function renderResults(ranked,hasFixedEnd,totalComputed,skipScroll = false){
+  lastResults = ranked;
+  lastFixedEnd = hasFixedEnd;
+  saveAppState();
+
+  const el=document.getElementById("results");
+  const count=totalComputed||ranked.length;
+  let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
+  html+=buildRouteCard(ranked[0],hasFixedEnd,true);
+  if(ranked.length>1){
+    const worstR=ranked[ranked.length-1];
+    const diff=worstR.total-ranked[0].total;
+    const diffLabel=fmtDur(diff);
+    html+=`<div class="worst-accordion">
+      <button class="worst-toggle" id="worst-toggle" onclick="toggleWorst()">
+        <span>SEE UNOPTIMIZED ROUTE (+${diffLabel} LONGER)</span>
+        <span class="worst-toggle-arrow">▼</span>
+      </button>
+      <div class="worst-body" id="worst-body">${buildRouteCard(worstR,hasFixedEnd,false)}</div>
+    </div>`;
+  }
+  el.innerHTML=html;
+  // Collapse input section
+  collapseInputSection(ranked[0], skipScroll);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function setProgress(done,total,label){const pct=total?Math.round(done/total*100):0;document.getElementById("progress").innerHTML=`<div class="prog-wrap"><div class="prog-label pulse">● SEARCHING — ${pct}%</div><div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div><div class="prog-detail">${esc(label)}</div></div>`;}
+function showErr(msg){document.getElementById("results").innerHTML=`<div class="error-box">⚠️ ${esc(msg)}</div>`;}
+function fmtDur(m){if(!m||m===Infinity)return"?";if(m<60)return`${m} MIN`;const h=Math.floor(m/60),r=m%60;return r===0?`${h}H`:`${h}H ${r}M`;}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function toggleWorst(){
+  const btn=document.getElementById("worst-toggle");
+  const body=document.getElementById("worst-body");
+  if(!btn||!body)return;
+  btn.classList.toggle("open");
+  body.classList.toggle("open");
+}
+
+function collapseInputSection(bestRoute, skipScroll = false){
+  const sec=document.getElementById("input-section");
+  const summaryEl=document.getElementById("collapsed-summary-text");
+  if(!sec||!summaryEl)return;
+  // Build a short summary of the route
+  const stops=bestRoute.route.map(s=>s.resolved?.name||"?");
+  const short=stops.map((n,i)=>{
+    const parts=n.split(/[,–-]/);return parts[0].trim().substring(0,22);
+  });
+  summaryEl.innerHTML=short.map((n,i)=>`<span style="color:${i===0||i===short.length-1?'#aaa':'#777'}">${esc(n)}</span>`).join('<span style="color:#333"> → </span>');
+  sec.classList.add("collapsed");
+  saveAppState();
+  // Scroll results into view
+  if (!skipScroll) {
+    setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth",block:"start"}),100);
+  }
+}
+
+function manualCollapse(){
+  const sec=document.getElementById("input-section");
+  if(sec) {
+    sec.classList.add("collapsed");
+    saveAppState();
+  }
+}
+
+function expandInputSection(){
+  const sec=document.getElementById("input-section");
+  if(sec) {
+    sec.classList.remove("collapsed");
+    saveAppState();
+    // Show manual collapse button if we have results
+    const res = document.getElementById("results");
+    const btn = document.getElementById("manual-collapse-btn");
+    if (btn) {
+      if (res && res.children.length > 0 && !res.querySelector('.error-box')) {
+        btn.style.display = "block";
+      } else {
+        btn.style.display = "none";
+      }
+    }
+  }
+}
+
+function openHamburger(){
+  document.getElementById("hamburger-menu").style.display="block";
+  updateHamburgerUser();
+}
+function closeHamburger(){
+  document.getElementById("hamburger-menu").style.display="none";
+}
+
+function showAuthOverlay() {
+  const overlay = document.getElementById("auth-overlay");
+  if (overlay) {
+    overlay.style.display = "flex";
+    // Ensure dropdown is synced
+    const authSelect = document.getElementById("auth-country");
+    if (authSelect) {
+      authSelect.value = currentSource === "obb" ? "AUT" : userCountry;
+      onAuthCountryChange();
+    }
+  }
+  closeHamburger();
+}
+
+function updateHamburgerUser(){
+  const user=window._currentUser||null;
+  const nameEl=document.getElementById("hbg-name");
+  const subEl=document.getElementById("hbg-sub");
+  const avatarEl=document.getElementById("hbg-avatar");
+  if(user){
+    if(nameEl) nameEl.textContent=(user.displayName||user.email||"USER").toUpperCase();
+    if(subEl) subEl.textContent="SIGNED IN WITH GOOGLE";
+    if(avatarEl) avatarEl.innerHTML=user.photoURL?`<img src="${user.photoURL}" referrerpolicy="no-referrer">`:"👤";
+  } else {
+    if(nameEl) nameEl.textContent="GUEST";
+    if(subEl) subEl.textContent="NOT SIGNED IN";
+    if(avatarEl) avatarEl.innerHTML="👤";
+  }
+  updateCounter();
+}
+
+function getRegionDisplayName(country, source) {
+  if (source === "obb") return "Austria (ÖBB)";
+  const sel = document.getElementById("hbg-country-select");
+  if (!sel) return country || "Global";
+  const opt = Array.from(sel.options).find(o => o.value === country);
+  return opt ? opt.textContent : country || "Global";
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function permute(arr){if(arr.length<=1)return[arr.slice()];const out=[];for(let i=0;i<arr.length;i++){const rest=arr.filter((_,j)=>j!==i);for(const p of permute(rest))out.push([arr[i],...p]);}return out;}
+
+// ── SEARCH BUTTON COST LABEL ──────────────────────────────────────────
+function calcSearchCost(){
+  const hasStart=!!startStop.resolved;
+  const resolvedMids=midStops.filter(s=>s.resolved).length;
+  const hasEnd=!!endStop.resolved;
+  return (hasStart?1:0)+resolvedMids+(hasEnd?1:0);
+}
+function updateSearchBtn(){
+  const btn=document.getElementById("search-btn");
+  if(!btn||searching)return;
+  const cost=calcSearchCost();
+  btn.innerHTML=cost>0
+    ?`FIND SHORTEST ROUTE <span style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:4px;padding:1px 8px;font-size:14px;margin-left:6px;vertical-align:middle;letter-spacing:1px">${cost} PT${cost===1?"":"S"}</span>`
+    :"FIND SHORTEST ROUTE";
+}
+
+
+// ── CURRENT LOCATION ─────────────────────────────────────────────────
+const MAX_LOC_STOPS = 2;
+
+function updateLocationButtons() {
+  // Location buttons now live inside the suggestions dropdown, nothing to update globally
+}
+
+async function useCurrentLocation(stopId) {
+  const sidKey = isNaN(stopId) ? stopId : Number(stopId);
+  // If already set, clicking again clears it
+  if (locationStopIds.has(sidKey) || locationStopIds.has(stopId)) {
+    const s = getStopObj(stopId);
+    if (s) { clearStopObj(s); }
+    locationStopIds.delete(sidKey); locationStopIds.delete(stopId);
+    // Re-render the right slot
+    if (stopId === "start") renderSlot("start-slot",startStop,"neutral","e.g. Paris Gare du Nord…",true,"start",null);
+    else if (stopId === "end") renderSlot("end-slot",endStop,"neutral","e.g. Tokyo Station…",true,"end",null);
+    else renderMidList();
+    updateLocationButtons();
+    return;
+  }
+  if (locationStopIds.size >= MAX_LOC_STOPS) return;
+
+  const btn = document.getElementById("loc-" + stopId);
+  if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
+
+  try {
+    const pos = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, {timeout:10000, enableHighAccuracy:true})
+    );
+    const {latitude:lat, longitude:lng} = pos.coords;
+
+    if (currentSource === "here") {
+      const r = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&limit=1&apiKey=${HERE_KEY}`);
+      const d = await r.json();
+      const name = d.items?.[0]?.title || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      pickStop(stopId, {name, lat, lng, type:"place"}, midStops.some(s=>s.id===Number(stopId)));
+    } else {
+      // ÖBB: reverse geocode name then find nearest station
+      let cityName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      try {
+        const r = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&limit=1&apiKey=${HERE_KEY}`);
+        const d = await r.json();
+        cityName = d.items?.[0]?.address?.city || d.items?.[0]?.title || cityName;
+      } catch {}
+      const locs = await locMatchOBB(cityName);
+      if (!locs.length) throw new Error("No nearby station found");
+      pickStop(stopId, locs[0], midStops.some(s=>s.id===Number(stopId)));
+    }
+
+    locationStopIds.add(isNaN(stopId) ? stopId : Number(stopId));
+    updateLocationButtons();
+    saveAppState();
+  } catch(err) {
+    if (btn) { btn.textContent = "📍"; btn.disabled = false; }
+    let msg = "Could not get location.";
+    if (err.code === 1) msg = "Location permission denied.";
+    else if (err.code === 3) msg = "Location request timed out.";
+    showErr(msg);
+  }
+}
+
+// ── FREEMIUM / AD SYSTEM ──────────────────────────────────────────────
+const INITIAL_POINTS  = 20;
+const AD_GRANT        = 10;
+const AD_DURATION_MS  = 5000;
+
+let pointsLeft  = parseInt(localStorage.getItem("pointsLeft") ?? INITIAL_POINTS);
+let adResolve   = null;
+let confirmResolve = null;
+
+function savePoints() { localStorage.setItem("pointsLeft", pointsLeft); }
+
+function updateCounter() {
+  const fill = document.getElementById("counter-fill");
+  if (fill) {
+    fill.style.width = Math.min(pointsLeft / INITIAL_POINTS * 100, 100) + "%";
+    fill.style.background = pointsLeft <= 3 ? "#cc0000" : pointsLeft <= 8 ? "#aa6600" : "#2a8a2a";
+  }
+  // Update hamburger panel
+  const hbgPts = document.getElementById("hbg-pts");
+  const hbgFill = document.getElementById("hbg-pts-fill");
+  if (hbgPts) hbgPts.textContent = pointsLeft;
+  if (hbgFill) {
+    hbgFill.style.width = Math.min(pointsLeft / INITIAL_POINTS * 100, 100) + "%";
+    hbgFill.style.background = pointsLeft <= 3 ? "#cc0000" : pointsLeft <= 8 ? "#aa6600" : "#2a8a2a";
+  }
+}
+
+// Ask user if they want to watch an ad
+function showAdConfirm(cost) {
+  return new Promise(resolve => {
+    confirmResolve = resolve;
+    const modal = document.getElementById("ad-confirm-modal");
+    document.getElementById("confirm-cost").textContent = cost;
+    document.getElementById("confirm-grant").textContent = AD_GRANT;
+    modal.style.display = "flex";
+  });
+}
+function onConfirmYes() {
+  document.getElementById("ad-confirm-modal").style.display = "none";
+  if (confirmResolve) { confirmResolve(true); confirmResolve = null; }
+}
+function onConfirmNo() {
+  document.getElementById("ad-confirm-modal").style.display = "none";
+  if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
+}
+
+// Show the actual ad and wait for completion
+function showAd() {
+  return new Promise(resolve => {
+    adResolve = resolve;
+    const overlay   = document.getElementById("ad-overlay");
+    const skipBtn   = document.getElementById("ad-skip-btn");
+    const countText = document.getElementById("ad-countdown-text");
+    const progFill  = document.getElementById("ad-progress-fill");
+    overlay.style.display = "flex";
+    skipBtn.classList.remove("ready");
+    skipBtn.textContent = `WATCH TO UNLOCK +${AD_GRANT} POINTS`;
+    skipBtn.disabled = true;
+    progFill.style.width = "0%";
+    const start = Date.now();
+    const tick = setInterval(() => {
+      const elapsed  = Date.now() - start;
+      const pct      = Math.min(elapsed / AD_DURATION_MS * 100, 100);
+      const secsLeft = Math.ceil((AD_DURATION_MS - elapsed) / 1000);
+      progFill.style.width = pct + "%";
+      countText.textContent = elapsed >= AD_DURATION_MS ? "READY" : `SKIP IN ${secsLeft}`;
+      if (elapsed >= AD_DURATION_MS) {
+        clearInterval(tick);
+        skipBtn.classList.add("ready");
+        skipBtn.textContent = `✓ CLOSE AD & GET +${AD_GRANT} POINTS`;
+        skipBtn.disabled = false;
+      }
+    }, 100);
+  });
+}
+
+function onAdComplete() {
+  document.getElementById("ad-overlay").style.display = "none";
+  pointsLeft += AD_GRANT;
+  savePoints();
+  updateCounter();
+  if (adResolve) { adResolve(); adResolve = null; }
+}
+
+// Called by doSearch after validation — handles gate + deduction
+async function freemiumGate(cost) {
+  if (pointsLeft >= cost) {
+    pointsLeft -= cost;
+    savePoints();
+    updateCounter();
+    return true; // proceed
+  }
+  // Not enough points — ask first
+  const wantsAd = await showAdConfirm(cost);
+  if (!wantsAd) return false; // user declined
+  await showAd();
+  // Now grant and deduct
+  pointsLeft -= cost;
+  savePoints();
+  updateCounter();
+  return true;
+}
+
+// Init counter on load
+updateCounter();
+
+// ── AUTH FUNCTIONS ────────────────────────────────────────────────────
+function onAuthCountryChange() {
+  const val = document.getElementById("auth-country").value;
+  const hasCountry = val !== "";
+  document.getElementById("auth-google-btn").disabled = !hasCountry;
+  document.getElementById("auth-skip-btn").disabled   = !hasCountry;
+}
+
+function applyCountryFromAuth() {
+  const val = document.getElementById("auth-country").value;
+  if (!val) return false;
+  userCountry   = val === "AUT" ? "" : val;  // ÖBB handles Austria natively
+  currentSource = val === "AUT" ? "obb" : "here";
+  localStorage.setItem("userCountry", userCountry);
+  localStorage.setItem("currentSource", currentSource);
+  // Sync hamburger select as well
+  const hbgSelect = document.getElementById("hbg-country-select");
+  if (hbgSelect) hbgSelect.value = val;
+  resetResolution();
+  return true;
+}
+
+function showApp() {
+  const overlay = document.getElementById("auth-overlay");
+  if (overlay) overlay.style.display = "none";
+}
+
+function skipLogin() {
+  if (!applyCountryFromAuth()) return;
+  showApp();
+}
+
+async function signInGoogle() {
+  if (!applyCountryFromAuth()) return;
+  const errEl = document.getElementById("auth-error");
+  errEl.textContent = "";
+  try {
+    await window._signInWithPopup(window._firebaseAuth, window._googleProvider);
+    showApp();
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user") {
+      errEl.textContent = "Sign-in failed. Try again.";
+    }
+  }
+}
+
+function updateAuthUI(user) {
+  const slot = document.getElementById("auth-pill-slot");
+  if (!slot) return;
+  if (user) {
+    slot.innerHTML = `
+      <div class="auth-pill" onclick="handleSignOut()" title="Click to sign out">
+        <div class="auth-pill-avatar">
+          ${user.photoURL ? `<img src="${user.photoURL}" referrerpolicy="no-referrer">` : ""}
+        </div>
+        <span class="auth-pill-name">${user.displayName || user.email || "SIGNED IN"}</span>
+        <span class="auth-pill-out">SIGN OUT</span>
+      </div>`;
+    // Only auto-skip the overlay if user already chose a country this session
+    if (userCountry || currentSource === "obb") showApp();
+  } else {
+    slot.innerHTML = `
+      <div class="auth-pill" onclick="showAuthOverlay()" style="background:#1a1a1a; border-color:#2a2a2a">
+        <div class="auth-pill-avatar" style="background:rgba(255,255,255,0.1)">👤</div>
+        <span class="auth-pill-name" style="color:#888">GUEST USER</span>
+        <span class="auth-pill-out" style="color:#555">SIGN IN</span>
+      </div>`;
+  }
+  updateHamburgerUser();
+}
+
+async function handleSignOut() {
+  await window._signOut(window._firebaseAuth);
+}
+</script>
+
+
+<!-- History Confirm Modal -->
+<div class="ad-overlay" id="history-confirm-modal" style="display:none">
+  <div class="confirm-modal">
+    <div class="confirm-icon">🌍</div>
+    <div class="confirm-title">SWITCH REGION?</div>
+    <div class="confirm-body">
+      This result is from <strong><span id="hist-conf-new">X</span></strong> while your current region is <strong><span id="hist-conf-curr">Y</span></strong>.<br><br>
+      Switch regions to load this history?
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-no"  onclick="onHistConfirmNo()">NO</button>
+      <button class="confirm-yes" onclick="onHistConfirmYes()">YES, SWITCH</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ad Confirm Modal -->
+<div class="ad-overlay" id="ad-confirm-modal" style="display:none">
+  <div class="confirm-modal">
+    <div class="confirm-icon">🎬</div>
+    <div class="confirm-title">OUT OF POINTS</div>
+    <div class="confirm-body">
+      This search costs <strong><span id="confirm-cost">0</span> points</strong> but you have none left.<br><br>
+      Watch a short ad to earn <strong>+<span id="confirm-grant">10</span> points</strong> and continue?
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-no"  onclick="onConfirmNo()">NO THANKS</button>
+      <button class="confirm-yes" onclick="onConfirmYes()">WATCH AD</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ad Modal -->
+<div class="ad-overlay" id="ad-overlay" style="display:none">
+  <div class="ad-modal">
+    <div class="ad-modal-header">
+      <span class="ad-modal-tag">ADVERTISEMENT</span>
+      <span class="ad-countdown" id="ad-countdown-text">SKIP IN 5</span>
+    </div>
+    <div class="ad-modal-body">
+      <div class="ad-placeholder-bg"></div>
+      <div class="ad-placeholder-content">
+        <div class="ad-brand">YOUR AD HERE</div>
+        <div class="ad-tagline">PLACE YOUR ADVERTISEMENT · 320×250</div>
+      </div>
+    </div>
+    <div class="ad-modal-footer">
+      <div class="ad-progress"><div class="ad-progress-fill" id="ad-progress-fill" style="width:0%"></div></div>
+      <button class="ad-skip-btn" id="ad-skip-btn" onclick="onAdComplete()">WATCH TO UNLOCK 10 MORE SEARCHES</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+  </div>
+  </div>
+</div>
+</body>
+</html>
