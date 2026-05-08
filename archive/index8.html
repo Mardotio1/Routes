@@ -474,11 +474,11 @@
         <div class="two-col" style="margin-bottom:0">
           <div class="dt-wrap">
             <div class="dt-label">DEPARTURE DATE</div>
-            <input type="date" id="dep-date" class="dt-input" maxlength="100">
+            <input type="date" id="dep-date" class="dt-input">
           </div>
           <div class="dt-wrap">
             <div class="dt-label">TIME</div>
-            <input type="time" id="dep-time" class="dt-input" maxlength="100">
+            <input type="time" id="dep-time" class="dt-input">
           </div>
         </div>
 
@@ -720,7 +720,7 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
     <div class="stop-input-wrap">
       <input class="stop-input${s.resolved?" resolved":""}" id="inp-${s.id}"
         type="text" placeholder="${ph}" autocomplete="off" spellcheck="false"
-        value="${esc(s.inputVal)}" maxlength="100"
+        value="${esc(s.inputVal)}"
         oninput="onInput('${s.id}',this.value,${section==='mid'})"
         onkeydown="onKeydown(event,'${s.id}')"
         onfocus="onInputFocus('${s.id}')"
@@ -737,11 +737,11 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
 }
 
 // ── MIDDLE STOPS ──────────────────────────────────────────────────────
-function addStop(shouldFocus=true){
+function addStop(){
   const id=++stopCtr;
   midStops.push({id,resolved:null,inputVal:""});
   renderMidList();
-  if(shouldFocus) setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
+  setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
 }
 function removeStop(id){
   if(midStops.length<=1)return;
@@ -1008,15 +1008,7 @@ async function doSearch(){
     prog.style.display="none";
     if(stopRequested){showErr("Search was stopped.");return;}
     if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
-
-    const totalComputed = ranked.length;
-    if (ranked.length > 2) {
-      const best = ranked[0];
-      const worst = ranked[ranked.length - 1];
-      ranked.length = 0;
-      ranked.push(best, worst);
-    }
-    renderResults(ranked, !!fixedEnd, totalComputed);
+    renderResults(ranked,!!fixedEnd);
     saveToHistory(ranked);
   }catch(e){showErr(e.message);}
   finally{searching=false;stopRequested=false;updateSearchBtn();btn.classList.remove("stopping");btn.disabled=false;prog.style.display="none";}
@@ -1031,10 +1023,9 @@ function buildRouteCard(r,hasFixedEnd,isBest){
   html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${ld}"></div></div><div class="leg-content"><div class="leg-stop-name${ln}">${esc(last.resolved?.name??"—")}</div></div></div></div></div>`;
   return html;
 }
-function renderResults(ranked,hasFixedEnd,totalComputed){
+function renderResults(ranked,hasFixedEnd){
   const el=document.getElementById("results");
-  const count = totalComputed || ranked.length;
-  let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
+  let html=`<div class="res-header">${ranked.length>1?ranked.length+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
   html+=buildRouteCard(ranked[0],hasFixedEnd,true);
   if(ranked.length>1){
     const worstR=ranked[ranked.length-1];
@@ -1471,5 +1462,13 @@ async function handleSignOut() {
     </div>
   </div>
 </div>
+</body>
+</html>
+  </div>
+  </div>
+</div>
+</body>
+</html>
+/div>
 </body>
 </html>
