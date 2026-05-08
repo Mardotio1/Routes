@@ -477,11 +477,11 @@
         <div class="two-col" style="margin-bottom:0">
           <div class="dt-wrap">
             <div class="dt-label">DEPARTURE DATE</div>
-            <input type="date" id="dep-date" class="dt-input" onchange="saveAppState()">
+            <input type="date" id="dep-date" class="dt-input">
           </div>
           <div class="dt-wrap">
             <div class="dt-label">TIME</div>
-            <input type="time" id="dep-time" class="dt-input" onchange="saveAppState()">
+            <input type="time" id="dep-time" class="dt-input">
           </div>
         </div>
 
@@ -553,43 +553,6 @@ let searching = false;
 let dragSrc   = null;
 let stopRequested = false;
 let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
-let locationStopIds = new Set(); // track which stopIds used "my location"
-
-const STATE_KEY = "fastRoutesAppState";
-
-function saveAppState() {
-  const state = {
-    startStop,
-    endStop,
-    midStops,
-    stopCtr,
-    locationStopIds: Array.from(locationStopIds),
-    depDate: document.getElementById("dep-date").value,
-    depTime: document.getElementById("dep-time").value
-  };
-  localStorage.setItem(STATE_KEY, JSON.stringify(state));
-}
-
-function loadAppState() {
-  const saved = localStorage.getItem(STATE_KEY);
-  if (saved) {
-    try {
-      const state = JSON.parse(saved);
-      startStop = state.startStop || startStop;
-      endStop = state.endStop || endStop;
-      midStops = state.midStops || [];
-      stopCtr = state.stopCtr || 0;
-      locationStopIds = new Set(state.locationStopIds || []);
-      if (state.depDate) document.getElementById("dep-date").value = state.depDate;
-      if (state.depTime) document.getElementById("dep-time").value = state.depTime;
-    } catch (e) { console.error("Failed to load app state", e); }
-  }
-
-  if (midStops.length === 0) {
-    addStop(false); addStop(false);
-  }
-  renderAll();
-}
 
 // ── BOOT ──────────────────────────────────────────────────────────────
 (function init(){
@@ -612,7 +575,7 @@ function loadAppState() {
     showApp(); // Hide sign-in if already chosen
   }
 
-  loadAppState();
+  renderAll(); addStop(false); addStop(false);
   renderHistory();
 })();
 
@@ -722,7 +685,6 @@ function applyHistoryItem(item) {
   endStop = JSON.parse(JSON.stringify(item.endStop));
 
   renderAll();
-  saveAppState();
   if (item.isStopped) {
     showErr("This search was stopped before completion.");
     expandInputSection();
@@ -743,7 +705,6 @@ function onHbgCountryChange() {
   const authSelect = document.getElementById("auth-country");
   if (authSelect) authSelect.value = val;
   resetResolution();
-  saveAppState();
 }
 
 function resetResolution() {
@@ -752,7 +713,6 @@ function resetResolution() {
   midStops.forEach(clear);
   clear(endStop);
   renderAll();
-  saveAppState();
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────
@@ -800,7 +760,6 @@ function addStop(doFocus = true){
   const id=++stopCtr;
   midStops.push({id,resolved:null,inputVal:""});
   renderMidList();
-  saveAppState();
   if(doFocus) setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
 }
 function removeStop(id){
@@ -809,7 +768,6 @@ function removeStop(id){
   locationStopIds.delete(Number(id));
   renderMidList();
   updateLocationButtons();
-  saveAppState();
 }
 // If only one mid stop left: clear it. If multiple: delete it.
 function removeOrClearMid(id){
@@ -821,7 +779,6 @@ function removeOrClearMid(id){
     locationStopIds.delete(s.id);
     renderMidList();
     updateLocationButtons();
-    saveAppState();
   }
 }
 
@@ -837,19 +794,19 @@ function onDrop(e,tgtSection,tgtId){
   e.preventDefault();clearDragClasses();if(!dragSrc)return;
   const{section:src,id:srcId}=dragSrc;dragSrc=null;
   if(src==='start'){
-    if(tgtSection==='end'){const t=snap(startStop);copyInto(startStop,endStop);copyInto(endStop,t);renderAll();saveAppState();return;}
+    if(tgtSection==='end'){const t=snap(startStop);copyInto(startStop,endStop);copyInto(endStop,t);renderAll();return;}
     if(tgtSection==='mid'&&(startStop.resolved||startStop.inputVal.trim())){const ti=midStops.findIndex(s=>s.id===tgtId);midStops.splice(ti,0,{id:++stopCtr,resolved:startStop.resolved,inputVal:startStop.inputVal});}
-    clearStopObj(startStop);renderAll();saveAppState();return;
+    clearStopObj(startStop);renderAll();return;
   }
   if(src==='end'){
-    if(tgtSection==='start'){const t=snap(endStop);copyInto(endStop,startStop);copyInto(startStop,t);renderAll();saveAppState();return;}
+    if(tgtSection==='start'){const t=snap(endStop);copyInto(endStop,startStop);copyInto(startStop,t);renderAll();return;}
     if(tgtSection==='mid'&&(endStop.resolved||endStop.inputVal.trim())){const ti=midStops.findIndex(s=>s.id===tgtId);midStops.splice(ti,0,{id:++stopCtr,resolved:endStop.resolved,inputVal:endStop.inputVal});}
-    clearStopObj(endStop);renderAll();saveAppState();return;
+    clearStopObj(endStop);renderAll();return;
   }
   const sm=midStops.find(s=>s.id===srcId);if(!sm)return;
-  if(tgtSection==='start'){const e2=!startStop.resolved&&!startStop.inputVal.trim();const os=snap(startStop);copyInto(startStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,os);renderAll();saveAppState();return;}
-  if(tgtSection==='end'){const e2=!endStop.resolved&&!endStop.inputVal.trim();const oe=snap(endStop);copyInto(endStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,oe);renderAll();saveAppState();return;}
-  if(tgtSection==='mid'&&srcId!==tgtId){const si=midStops.findIndex(s=>s.id===srcId);const ti=midStops.findIndex(s=>s.id===tgtId);if(si===-1||ti===-1)return;const[item]=midStops.splice(si,1);midStops.splice(si<ti?ti-1:ti,0,item);renderMidList();saveAppState();}
+  if(tgtSection==='start'){const e2=!startStop.resolved&&!startStop.inputVal.trim();const os=snap(startStop);copyInto(startStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,os);renderAll();return;}
+  if(tgtSection==='end'){const e2=!endStop.resolved&&!endStop.inputVal.trim();const oe=snap(endStop);copyInto(endStop,sm);if(e2){if(midStops.length>1)midStops=midStops.filter(s=>s.id!==srcId);else clearStopObj(sm);}else copyInto(sm,oe);renderAll();return;}
+  if(tgtSection==='mid'&&srcId!==tgtId){const si=midStops.findIndex(s=>s.id===srcId);const ti=midStops.findIndex(s=>s.id===tgtId);if(si===-1||ti===-1)return;const[item]=midStops.splice(si,1);midStops.splice(si<ti?ti-1:ti,0,item);renderMidList();}
 }
 function onDragEnd(){dragSrc=null;clearDragClasses();}
 function clearDragClasses(){document.querySelectorAll(".stop-row").forEach(r=>r.classList.remove("drag-over","dragging","drag-src-anchor"));}
@@ -867,7 +824,6 @@ function clearSlot(section){
     renderSlot("end-slot",endStop,"neutral","e.g. Tokyo Station…",true,"end",null);
   }
   updateLocationButtons();
-  saveAppState();
 }
 
 // ── INPUT / AUTOCOMPLETE ──────────────────────────────────────────────
@@ -883,7 +839,6 @@ function onInput(id,val,isMid){
   const lbl=document.getElementById(`lbl-${id}`);if(lbl){lbl.className="stop-check";}
   hideSug(id);clearTimeout(sugTimers[id]);
   updateSearchBtn();
-  saveAppState();
   if(val.trim().length<2){
     // show dropdown with just the location option immediately
     showSug(id,[],isMid);
@@ -934,7 +889,6 @@ function pickStop(id,loc,isMid){
   if(lbl){lbl.className="stop-check visible";}
   hideSug(id);
   updateSearchBtn();
-  saveAppState();
 }
 function hideSug(id){const el=document.getElementById(`sug-${id}`);if(el){el.style.display="none";el.innerHTML="";}}
 document.addEventListener("click",e=>{
@@ -1238,6 +1192,7 @@ function updateSearchBtn(){
 
 // ── CURRENT LOCATION ─────────────────────────────────────────────────
 const MAX_LOC_STOPS = 2;
+let locationStopIds = new Set(); // track which stopIds used "my location"
 
 function updateLocationButtons() {
   // Location buttons now live inside the suggestions dropdown, nothing to update globally
@@ -1288,7 +1243,6 @@ async function useCurrentLocation(stopId) {
 
     locationStopIds.add(isNaN(stopId) ? stopId : Number(stopId));
     updateLocationButtons();
-    saveAppState();
   } catch(err) {
     if (btn) { btn.textContent = "📍"; btn.disabled = false; }
     let msg = "Could not get location.";
