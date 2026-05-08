@@ -522,7 +522,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.6";
+const APP_VERSION = "0.5.5";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -572,7 +572,7 @@ let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
     showApp(); // Hide sign-in if already chosen
   }
 
-  renderAll(); addStop(false); addStop(false);
+  renderAll(); addStop(); addStop();
   renderHistory();
 })();
 
@@ -582,9 +582,6 @@ function saveToHistory(ranked) {
   const first = best.route[0].resolved?.name || "?";
   const last = best.route[best.route.length - 1].resolved?.name || "?";
   
-  // Prune ranked results for history storage to avoid "Invalid string length" / localStorage limits
-  const prunedRanked = ranked.length > 1 ? [ranked[0], ranked[ranked.length - 1]] : [ranked[0]];
-
   const entry = {
     name: `${first.split(/[,–-]/)[0].trim()} → ${last.split(/[,–-]/)[0].trim()}`,
     date: document.getElementById("dep-date").value,
@@ -592,7 +589,7 @@ function saveToHistory(ranked) {
     startStop: JSON.parse(JSON.stringify(startStop)),
     midStops: JSON.parse(JSON.stringify(midStops)),
     endStop: JSON.parse(JSON.stringify(endStop)),
-    ranked: prunedRanked,
+    ranked: ranked,
     timestamp: Date.now(),
     userCountry: userCountry,
     currentSource: currentSource
@@ -722,7 +719,7 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
     <div class="stop-input-wrap">
       <input class="stop-input${s.resolved?" resolved":""}" id="inp-${s.id}"
         type="text" placeholder="${ph}" autocomplete="off" spellcheck="false"
-        value="${esc(s.inputVal)}" maxlength="100"
+        value="${esc(s.inputVal)}"
         oninput="onInput('${s.id}',this.value,${section==='mid'})"
         onkeydown="onKeydown(event,'${s.id}')"
         onfocus="onInputFocus('${s.id}')"
@@ -739,11 +736,11 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
 }
 
 // ── MIDDLE STOPS ──────────────────────────────────────────────────────
-function addStop(doFocus = true){
+function addStop(){
   const id=++stopCtr;
   midStops.push({id,resolved:null,inputVal:""});
   renderMidList();
-  if(doFocus) setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
+  setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
 }
 function removeStop(id){
   if(midStops.length<=1)return;
