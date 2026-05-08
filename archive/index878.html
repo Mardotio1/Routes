@@ -461,7 +461,7 @@
     <!-- Collapsible input section -->
     <div class="input-section" id="input-section">
       <!-- Collapsed summary (shown after search) -->
-      <div class="collapsed-summary" onclick="expandInputSection()" id="collapsed-summary">
+      <div class="collapsed-summary" onclick="toggleInputSection()" id="collapsed-summary">
         <div class="collapsed-summary-row">
           <div class="collapsed-summary-stops" id="collapsed-summary-text">—</div>
           <div class="collapsed-expand-hint">TAP TO EDIT ↑</div>
@@ -474,11 +474,11 @@
         <div class="two-col" style="margin-bottom:0">
           <div class="dt-wrap">
             <div class="dt-label">DEPARTURE DATE</div>
-            <input type="date" id="dep-date" class="dt-input">
+            <input type="date" id="dep-date" class="dt-input" maxlength="100">
           </div>
           <div class="dt-wrap">
             <div class="dt-label">TIME</div>
-            <input type="time" id="dep-time" class="dt-input">
+            <input type="time" id="dep-time" class="dt-input" maxlength="100">
           </div>
         </div>
 
@@ -522,7 +522,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const APP_VERSION = "0.5.5";
+const APP_VERSION = "0.5.6";
 const HERE_KEY = "aVTOdKqE9lfyepvLVSRhJEziGwGotKyVZlpn4yzhO2c"; // ← paste your HERE API key here
 
 // ... rest of config ...
@@ -572,13 +572,14 @@ let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
     showApp(); // Hide sign-in if already chosen
   }
 
-  renderAll(); addStop(); addStop();
+  renderAll(); addStop(false); addStop(false);
   renderHistory();
 })();
 
 // ── HISTORY ───────────────────────────────────────────────────────────
 function saveToHistory(ranked) {
   const best = ranked[0];
+  const worst = ranked.length > 1 ? ranked[ranked.length - 1] : null;
   const first = best.route[0].resolved?.name || "?";
   const last = best.route[best.route.length - 1].resolved?.name || "?";
   
@@ -589,7 +590,7 @@ function saveToHistory(ranked) {
     startStop: JSON.parse(JSON.stringify(startStop)),
     midStops: JSON.parse(JSON.stringify(midStops)),
     endStop: JSON.parse(JSON.stringify(endStop)),
-    ranked: ranked,
+    ranked: worst ? [best, worst] : [best],
     timestamp: Date.now(),
     userCountry: userCountry,
     currentSource: currentSource
@@ -719,7 +720,7 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
     <div class="stop-input-wrap">
       <input class="stop-input${s.resolved?" resolved":""}" id="inp-${s.id}"
         type="text" placeholder="${ph}" autocomplete="off" spellcheck="false"
-        value="${esc(s.inputVal)}"
+        value="${esc(s.inputVal)}" maxlength="100"
         oninput="onInput('${s.id}',this.value,${section==='mid'})"
         onkeydown="onKeydown(event,'${s.id}')"
         onfocus="onInputFocus('${s.id}')"
@@ -736,11 +737,11 @@ function makeStopRow(s,dotColor,ph,canRemove,section,stopId){
 }
 
 // ── MIDDLE STOPS ──────────────────────────────────────────────────────
-function addStop(){
+function addStop(shouldFocus=true){
   const id=++stopCtr;
   midStops.push({id,resolved:null,inputVal:""});
   renderMidList();
-  setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
+  if(shouldFocus) setTimeout(()=>document.getElementById(`inp-${id}`)?.focus(),40);
 }
 function removeStop(id){
   if(midStops.length<=1)return;
@@ -965,6 +966,7 @@ async function doSearch(){
   const total=(hasStart?1:0)+validMids.length+(fixedEnd?1:0);
   if(validMids.length===0){showErr("Please enter at least one stop.");return;}
   if(total<2){showErr("Please enter at least 2 locations to plan a route.");return;}
+  if(validMids.length > 9){showErr("Too many stops (max 9) for optimized search.");return;}
 
   // Freemium gate — cost = number of resolved stops, only charged after validation
   const searchCost = total;
@@ -1006,7 +1008,15 @@ async function doSearch(){
     prog.style.display="none";
     if(stopRequested){showErr("Search was stopped.");return;}
     if(!ranked.length){showErr("No valid route found. Some segments may have no connections.");return;}
-    renderResults(ranked,!!fixedEnd);
+
+    const totalComputed = ranked.length;
+    if (ranked.length > 2) {
+      const best = ranked[0];
+      const worst = ranked[ranked.length - 1];
+      ranked.length = 0;
+      ranked.push(best, worst);
+    }
+    renderResults(ranked, !!fixedEnd, totalComputed);
     saveToHistory(ranked);
   }catch(e){showErr(e.message);}
   finally{searching=false;stopRequested=false;updateSearchBtn();btn.classList.remove("stopping");btn.disabled=false;prog.style.display="none";}
@@ -1021,9 +1031,10 @@ function buildRouteCard(r,hasFixedEnd,isBest){
   html+=`<div class="route-leg"><div class="leg-line"><div class="leg-dot-r ${ld}"></div></div><div class="leg-content"><div class="leg-stop-name${ln}">${esc(last.resolved?.name??"—")}</div></div></div></div></div>`;
   return html;
 }
-function renderResults(ranked,hasFixedEnd){
+function renderResults(ranked,hasFixedEnd,totalComputed){
   const el=document.getElementById("results");
-  let html=`<div class="res-header">${ranked.length>1?ranked.length+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
+  const count = totalComputed || ranked.length;
+  let html=`<div class="res-header">${count>1?count+" ROUTES COMPUTED":"ROUTE FOUND"}</div>`;
   html+=buildRouteCard(ranked[0],hasFixedEnd,true);
   if(ranked.length>1){
     const worstR=ranked[ranked.length-1];
@@ -1066,13 +1077,34 @@ function collapseInputSection(bestRoute){
   });
   summaryEl.innerHTML=short.map((n,i)=>`<span style="color:${i===0||i===short.length-1?'#aaa':'#777'}">${esc(n)}</span>`).join('<span style="color:#333"> → </span>');
   sec.classList.add("collapsed");
+  sec.classList.add("has-results");
+  document.getElementById("collapsed-expand-hint").textContent = "TAP TO EDIT ↑";
   // Scroll results into view
   setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth",block:"start"}),100);
 }
 
+function toggleInputSection(){
+  const sec=document.getElementById("input-section");
+  if(!sec) return;
+  const isCollapsed = sec.classList.contains("collapsed");
+  if(isCollapsed) {
+    sec.classList.remove("collapsed");
+    document.getElementById("collapsed-expand-hint").textContent = "TAP TO HIDE ↓";
+  } else {
+    // Only allow collapsing if there are results to show the summary for
+    if(document.getElementById("results").innerHTML !== "") {
+      sec.classList.add("collapsed");
+      document.getElementById("collapsed-expand-hint").textContent = "TAP TO EDIT ↑";
+    }
+  }
+}
+
 function expandInputSection(){
   const sec=document.getElementById("input-section");
-  if(sec) sec.classList.remove("collapsed");
+  if(sec) {
+    sec.classList.remove("collapsed");
+    document.getElementById("collapsed-expand-hint").textContent = "TAP TO HIDE ↓";
+  }
 }
 
 function openHamburger(){
@@ -1437,11 +1469,6 @@ async function handleSignOut() {
       <div class="ad-progress"><div class="ad-progress-fill" id="ad-progress-fill" style="width:0%"></div></div>
       <button class="ad-skip-btn" id="ad-skip-btn" onclick="onAdComplete()">WATCH TO UNLOCK 10 MORE SEARCHES</button>
     </div>
-  </div>
-</div>
-</body>
-</html>
-  </div>
   </div>
 </div>
 </body>
